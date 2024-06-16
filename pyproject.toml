@@ -1,0 +1,17 @@
+[project]
+name = 'xares'
+version = '0.0.1a4'
+description = 'eXtensive Audio Representation and Evaluation Suite'
+dependencies = []
+authors = [
+  { name = 'Junbo Zhang', email = 'zhangjunbo1@xiaomi.com' },
+  { name = 'Heinrich Dinkel', email = 'dinkelheinrich@xiaomi.com' },
+]
+readme = 'README.md'
+requires-python = '>=3.9'
+
+[project.urls]
+Repository = 'https://github.com/jimbozhang/xares.git'
+
+[tool.setuptools.packages.find]
+where = ['.']
