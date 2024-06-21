@@ -1,17 +1,45 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = 'xares'
-version = '0.0.1a4'
-description = 'eXtensive Audio Representation and Evaluation Suite'
-dependencies = []
-authors = [
-  { name = 'Junbo Zhang', email = 'zhangjunbo1@xiaomi.com' },
-  { name = 'Heinrich Dinkel', email = 'dinkelheinrich@xiaomi.com' },
+name = "xares"
+version = "0.0.1a4"
+description = "eXtensive Audio Representation and Evaluation Suite"
+dependencies = [
+  "accelerate",
+  "dasheng",
+  "fire",
+  "loguru",
+  "scikit-learn",
+  "torch>=2.1.1",
+  "torchaudio>=2.1.1",
+  "torchmetrics",
+  "pandas",
+  "pytorch-ignite",
+  "pyyaml",
+  "tqdm",
+  "webdataset>=0.2.86",
 ]
-readme = 'README.md'
-requires-python = '>=3.9'
+authors = [
+  {name = "Junbo Zhang", email = "zhangjunbo1@xiaomi.com"},
+  {name = "Heinrich Dinkel", email = "dinkelheinrich@xiaomi.com"},
+]
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
 
 [project.urls]
-Repository = 'https://github.com/jimbozhang/xares.git'
+Repository = "https://github.com/jimbozhang/xares.git"
+
+[project.optional-dependencies]
+tools = [
+  "black",
+  "isort",
+  "ipykernel",
+  "ipython",
+  "pyright",
+]
 
 [tool.setuptools.packages.find]
-where = ['.']
+where = ["src"]
