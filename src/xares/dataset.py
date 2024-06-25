@@ -1,6 +1,5 @@
 from typing import List, Optional
 
-import torchaudio
 import webdataset as wds
 
 
