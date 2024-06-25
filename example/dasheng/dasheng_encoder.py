@@ -12,5 +12,5 @@ class DashengEncoder(AudioEncoderBase):
     output_dim = 768
 
     def __call__(self, audio, sampling_rate):
-        # Since the "dasheng" model is already in the desired in/out format, we directly use the super class method
+        # Since the "dasheng" model is already in the required in/out format, we directly use the super class method
         return super().__call__(audio, sampling_rate)
