@@ -59,6 +59,12 @@ X-ARES is a toolkit for training, evaluating, and exporting audio encoders for v
 pip install xares
 ```
 
+For developing purposes, you can clone this repository and install the package in editable mode:
+
+```bash
+pip install -e .[example]
+```
+
 ## Configure your machine/cluster for training
 
 ```plain

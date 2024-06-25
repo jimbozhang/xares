@@ -4,11 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xares"
-version = "0.0.1a4"
+version = "0.0.1a5"
 description = "eXtensive Audio Representation and Evaluation Suite"
 dependencies = [
   "accelerate",
-  "dasheng",
   "fire",
   "loguru",
   "scikit-learn",
@@ -33,6 +32,9 @@ license = {file = "LICENSE"}
 Repository = "https://github.com/jimbozhang/xares.git"
 
 [project.optional-dependencies]
+example = [
+  "dasheng",
+]
 tools = [
   "black",
   "isort",
