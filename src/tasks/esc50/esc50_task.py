@@ -3,12 +3,13 @@ from dataclasses import dataclass
 from typing import List
 
 import pandas as pd
+from dasheng.prepare.wavlist_to_tar import proxy_read
+from dasheng.train.audiowebdataset import Audiowebdataset_Fluid
+from dasheng.train.models import Mlp
 from loguru import logger
 from tqdm import tqdm
 from webdataset import TarWriter, WebLoader
 
-from xares.dataset import Audiowebdataset, proxy_read
-from xares.models import Mlp
 from xares.task_base import TaskBase
 from xares.utils import download_file, mkdir_if_not_exists, unzip_file
 
@@ -88,7 +89,7 @@ class ESC50Task(TaskBase):
                 logger.info(f"Tar file {wds_encoded_path} already exists.")
                 continue
 
-            ds = Audiowebdataset(
+            ds = Audiowebdataset_Fluid(
                 [self.wds_audio_paths_dict[split].as_posix()],
                 crop_size=self.trim_length,
                 drop_crops=True,
