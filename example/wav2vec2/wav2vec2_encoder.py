@@ -9,7 +9,7 @@ from xares.audio_encoder_base import AudioEncoderBase
 class Wav2vec2Encoder(AudioEncoderBase):
     def __init__(self):
         super().__init__()
-        self.feat_extracter = Wav2Vec2FeatureExtractor.from_pretrained("facebook/wav2vec2-base-960h")
+        self.feat_extractor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/wav2vec2-base-960h")
         self.model = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base-960h")
         self.output_dim = 768
 
@@ -25,7 +25,7 @@ class Wav2vec2Encoder(AudioEncoderBase):
 
         audio = self.resample_audio_if_needed(audio, ori_sr=sampling_rate, target_sr=self.sampling_rate)
 
-        input_values = self.feat_extracter(audio, sampling_rate=sampling_rate, return_tensors="pt").input_values
+        input_values = self.feat_extractor(audio, sampling_rate=sampling_rate, return_tensors="pt").input_values
 
         with torch.inference_mode():
             encoded_audio = self.model(input_values.to(self.device))['last_hidden_state']
