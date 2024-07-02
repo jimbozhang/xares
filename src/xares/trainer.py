@@ -36,7 +36,7 @@ class Trainer:
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(self.validation_step)
 
-        torch.multiprocessing.set_start_method("spawn")
+        torch.multiprocessing.set_start_method("spawn", force=True)
 
     @classmethod
     def decode_wds_batch(self, batch: Tuple):

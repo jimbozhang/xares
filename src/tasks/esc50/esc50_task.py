@@ -101,7 +101,7 @@ class ESC50Task(TaskBase):
             batch_buf = []
             with TarWriter(wds_encoded_path.as_posix()) as ostream:
                 for batch, label, keys in tqdm(dl):
-                    encoded_batch = self.encoder(batch, 48_000)
+                    encoded_batch = self.encoder(batch)
                     batch_buf.append([encoded_batch, label, keys])
 
                     if len(batch_buf) >= self.save_encoded_per_batches:
