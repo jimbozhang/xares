@@ -1,4 +1,6 @@
 import json
+import copy
+import numpy as np
 from dataclasses import dataclass
 from typing import List
 
@@ -30,12 +32,7 @@ class ESC50Task(TaskBase):
         self.checkpoint_dir = self.env_dir / "checkpoints"
         self.ckpt_path = self.checkpoint_dir / "best_model.pt"
 
-        self.wds_encoded_training_fold_k = {
-            1: f"{self.env_dir}/" + "wds-encoded-fold-{02..05}.tar",
-            2: f"{self.env_dir}/" + "wds-encoded-fold-{01345}.tar",
-            3: f"{self.env_dir}/" + "wds-encoded-fold-{01245}.tar",
-            4: f"{self.env_dir}/" + "wds-encoded-fold-{01235}.tar",
-        }
+        self.wds_encoded_training_fold_k = {fold: [f"{self.env_dir}/wds-encoded-fold-0{f}.tar" for f in self.folds if f != fold] for fold in self.folds}
 
     def make_audio_tar(self):
         # Download and extract ESC-50 dataset
@@ -115,9 +112,19 @@ class ESC50Task(TaskBase):
         self.make_encoded_tar()
 
         # k-fold:
-        k = 1
-        self.train_mlp(
-            self.wds_encoded_training_fold_k[k],
-            self.wds_encoded_paths_dict[k].as_posix(),
-        )
-        self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], load_ckpt=True)
+        model = copy.deepcopy(self.model)
+        acc = []
+        for k in self.folds:
+            
+            self.train_mlp(
+                self.wds_encoded_training_fold_k[k],
+                self.wds_encoded_paths_dict[k].as_posix(),
+                max_epochs = 10,
+            )
+            acc.append(self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], load_ckpt=True))
+
+            self.model = copy.deepcopy(model).to(self.encoder.device)
+        
+        for k in range(len(self.folds)):
+            logger.info(f"Fold {k+1} accuracy: {acc[k]}")
+        logger.info(f"The averaged accuracy of 5 folds is: {np.mean(acc)}")

@@ -8,9 +8,9 @@ from xares.audio_encoder_base import AudioEncoderBase
 @dataclass
 class DashengEncoder(AudioEncoderBase):
     model = dasheng_base()
-    sampling_rate = 16_000
+    sampling_rate = 16_000 # model sr
     output_dim = 768
 
-    def __call__(self, audio, sampling_rate=48000):
+    def __call__(self, audio, sampling_rate = 44_100): # dataset sr
         # Since the "dasheng" model is already in the required in/out format, we directly use the super class method
         return super().__call__(audio, sampling_rate)
