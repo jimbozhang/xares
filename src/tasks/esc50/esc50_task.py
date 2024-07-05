@@ -7,13 +7,14 @@ from typing import List
 import pandas as pd
 from dasheng.prepare.wavlist_to_tar import proxy_read
 from dasheng.train.audiowebdataset import Audiowebdataset_Fluid
-from dasheng.train.models import Mlp
+#from dasheng.train.models import Mlp
 from loguru import logger
 from tqdm import tqdm
 from webdataset import TarWriter, WebLoader
 
 from xares.task_base import TaskBase
 from xares.utils import download_file, mkdir_if_not_exists, unzip_file
+from xares.trainer import Mlp
 
 
 @dataclass
@@ -115,11 +116,9 @@ class ESC50Task(TaskBase):
         model = copy.deepcopy(self.model)
         acc = []
         for k in self.folds:
-            
             self.train_mlp(
                 self.wds_encoded_training_fold_k[k],
                 self.wds_encoded_paths_dict[k].as_posix(),
-                max_epochs = 10,
             )
             acc.append(self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], load_ckpt=True))
 

@@ -18,7 +18,8 @@ class Trainer:
     accelerator = Accelerator()
     criterion: str = "CrossEntropyLoss"
     optimizer: str = "Adam"
-    lr: float = 0.001
+    lr: float = 1e-3
+    max_epochs: int = 15
     checkpoint_dir: str = "checkpoints"
     best_ckpt_path: str = None
 
@@ -40,7 +41,7 @@ class Trainer:
 
     @classmethod
     def decode_wds_batch(self, batch: Tuple):
-        x, y, _ = batch
+        x, y, z = batch
         return x.mean(1), y["target"].to(self.accelerator.device)
 
     def train_step(self, engine, batch):
@@ -60,7 +61,7 @@ class Trainer:
             y_pred = self.model(x)
             return y_pred, y
 
-    def run(self, dl_train, dl_dev, max_epochs=10):
+    def run(self, dl_train, dl_dev):
         trainer = Engine(self.train_step)
         evaluator = Engine(self.validation_step)
 
@@ -96,7 +97,7 @@ class Trainer:
         trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpoint_handler, {"model": self.model})
 
         logger.info("Trainer Run.")
-        trainer.run(dl_train, max_epochs=max_epochs)
+        trainer.run(dl_train, self.max_epochs)
 
 
 def inference(model, dl_eval):
@@ -115,3 +116,18 @@ def inference(model, dl_eval):
     all_preds = torch.cat(all_preds, dim=0)
     all_targets = torch.cat(all_targets, dim=0)
     return all_preds, all_targets
+
+
+class Mlp(nn.Module):
+    def __init__(self,
+                 in_features,
+                 out_features=None,):
+        super().__init__()
+        out_features = out_features or in_features
+        self.ln = nn.LayerNorm(in_features)
+        self.fc = nn.Linear(in_features, out_features)
+
+    def forward(self, x):
+        x = self.ln(x)
+        x = self.fc(x)
+        return x

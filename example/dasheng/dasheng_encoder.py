@@ -4,7 +4,6 @@ from dasheng import dasheng_base
 
 from xares.audio_encoder_base import AudioEncoderBase
 
-
 @dataclass
 class DashengEncoder(AudioEncoderBase):
     model = dasheng_base()

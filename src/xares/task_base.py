@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 import ignite.metrics
 import torch
@@ -12,6 +12,51 @@ from xares.audio_encoder_base import AudioEncoderBase
 from xares.dataset import EmbeddingWebdataset
 from xares.trainer import Trainer, inference
 
+import numpy as np
+
+def pad(tensorlist: Sequence[torch.Tensor], padding_value: float = 0.):
+    # Tensors are expected to be B, ..., T
+    lengths = [f.shape[-1] for f in tensorlist]
+    dims = tensorlist[0].shape
+    trailing_dims = dims[:-1]
+    batch_dim = len(lengths)
+    num_raw_samples = max(lengths)
+    out_dims = (batch_dim, ) + trailing_dims + (num_raw_samples, )
+    out_tensor = torch.full(out_dims,
+                            fill_value=padding_value,
+                            dtype=tensorlist[0].dtype)
+    for i, tensor in enumerate(tensorlist):
+        length = tensor.shape[-1]
+        out_tensor[i, ..., :length] = tensor[..., :length]
+    return out_tensor, torch.as_tensor(lengths)
+
+
+def collate_with_lengths_wds(samples,
+                             combine_scalars=True,
+                             flatten:bool = True,
+                             combine_tensors=True):
+    batched = list(zip(*samples))
+    result = []
+    for b in batched:
+        if isinstance(b[0], (int, float)):
+            if combine_scalars:
+                b = np.array(list(b))
+        elif isinstance(b[0], torch.Tensor):
+            if combine_tensors:
+                #Added lengths
+                b = pad(list(b))
+        elif isinstance(b[0], np.ndarray):
+            if combine_tensors:
+                b = np.array(list(b))
+        else:
+            b = list(b)
+        if flatten:
+            result.extend(b)
+        else:
+            result.append(b)
+    for b in result:
+        logger.info(f"{b}")
+    return result
 
 @dataclass
 class TaskBase(ABC):
@@ -46,20 +91,20 @@ class TaskBase(ABC):
     def make_encoded_tar(self):
         pass
 
-    def train_mlp(self, train_url: list, validation_url: str, max_epochs: int):
+    def train_mlp(self, train_url: list, validation_url: str):
         if not self.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
             return
 
         trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir)
 
-        ds_train = EmbeddingWebdataset(train_url, shuffle=1000)
-        dl_train = WebLoader(ds_train, batch_size=self.batch_size, num_workers=self.num_training_workers)
+        ds_train = EmbeddingWebdataset(train_url,shuffle=2000)
+        dl_train = WebLoader(ds_train, batch_size=16, num_workers=self.num_training_workers)#.shuffle(1600)
 
         ds_val = EmbeddingWebdataset(validation_url)
         dl_val = WebLoader(ds_val, batch_size=self.batch_size, num_workers=self.num_validation_workers)
 
-        trainer.run(dl_train, dl_val, max_epochs=max_epochs)
+        trainer.run(dl_train, dl_val)
 
     def evaluate_mlp(self, eval_url: str, metric: str = "Accuracy", load_ckpt: bool = False):
         if load_ckpt:
