@@ -18,8 +18,8 @@ class Trainer:
     accelerator = Accelerator()
     criterion: str = "CrossEntropyLoss"
     optimizer: str = "Adam"
-    lr: float = 1e-3
-    max_epochs: int = 15
+    lr: float = 3e-3
+    max_epochs: int = 10
     checkpoint_dir: str = "checkpoints"
     best_ckpt_path: str = None
 
@@ -129,5 +129,5 @@ class Mlp(nn.Module):
 
     def forward(self, x):
         x = self.ln(x)
-        x = self.fc(x)
+        x = self.fc(x).sigmoid()
         return x

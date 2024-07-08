@@ -21,7 +21,7 @@ from xares.trainer import Mlp
 class ESC50Task(TaskBase):
     folds = range(1, 6)  # This dataset requires 5-fold validation in evaluation
     save_encoded_per_batches = 1000  # If OOM, reduce this number
-    batch_size = 16
+    batch_size = 32
     trim_length = 220_500
     output_dim = 50
 

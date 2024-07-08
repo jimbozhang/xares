@@ -13,8 +13,9 @@ class Wav2vec2Encoder(AudioEncoderBase):
     def __post_init__(self):
         self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/wav2vec2-base-960h")
         self.model = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base-960h")
+        super().__post_init__()
 
-    def __call__(self, audio, sampling_rate):
+    def __call__(self, audio, sampling_rate = 44_100):
         input_values = (
             self.feature_extractor(
                 self.pre_process_audio(audio, sampling_rate), sampling_rate=self.sampling_rate, return_tensors="pt"
