@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 import torchaudio
+from accelerate import Accelerator
 from loguru import logger
 
 
@@ -14,23 +15,30 @@ class AudioEncoderBase(ABC):
     sampling_rate = 16_000
     output_dim = 0
     resample_warned = False
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = Accelerator().device
 
-    @abstractmethod
-    def __call__(self, audio: torch.Tensor, sampling_rate: int) -> Optional[torch.Tensor]:
-        if self.model is None:
-            return None
-
+    def __post_init__(self):
         self.model.to(self.device)
         self.model.eval()
 
+    def pre_process_audio(self, audio: torch.Tensor, sampling_rate: int) -> torch.Tensor:
         if not self.check_input_audio(audio, sampling_rate):
             raise ValueError("Invalid input audio")
 
         audio = self.resample_audio_if_needed(audio, ori_sr=sampling_rate, target_sr=self.sampling_rate)
+        return audio.to(self.device)
 
+    def encode_audio(self, audio: torch.Tensor) -> torch.Tensor:
         with torch.inference_mode():
-            encoded_audio = self.model(audio.to(self.device))
+            encoded_audio = self.model(audio)
+
+        return encoded_audio
+
+    @abstractmethod
+    def __call__(self, audio: torch.Tensor, sampling_rate: int) -> Optional[torch.Tensor]:
+        assert self.model is not None, "Model is not defined"
+
+        encoded_audio = self.encode_audio(self.pre_process_audio(audio, sampling_rate))
 
         if not self.check_encoded_audio(encoded_audio):
             raise ValueError("Invalid encoded audio")

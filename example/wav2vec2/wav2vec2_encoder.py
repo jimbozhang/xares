@@ -1,35 +1,29 @@
-import torch
-from loguru import logger
-from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Processor, Wav2Vec2Model
 from dataclasses import dataclass
+
+from loguru import logger
+from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
+
 from xares.audio_encoder_base import AudioEncoderBase
 
 
 @dataclass
 class Wav2vec2Encoder(AudioEncoderBase):
-    def __init__(self):
-        super().__init__()
-        self.feat_extractor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/wav2vec2-base-960h")
+    output_dim = 768
+
+    def __post_init__(self):
+        self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/wav2vec2-base-960h")
         self.model = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base-960h")
-        self.sampling_rate = 16_000 # model sr
-        self.output_dim = 768
 
-    def __call__(self, audio, sampling_rate = 44_100): # dataset sr
-        if self.model is None:
-            return None
+    def __call__(self, audio, sampling_rate):
+        input_values = (
+            self.feature_extractor(
+                self.pre_process_audio(audio, sampling_rate), sampling_rate=self.sampling_rate, return_tensors="pt"
+            )
+            .input_values.squeeze()
+            .to(self.device)
+        )
 
-        self.model.to(self.device)
-        self.model.eval()
-
-        if not self.check_input_audio(audio, sampling_rate):
-            raise ValueError("Invalid input audio")
-
-        audio = self.resample_audio_if_needed(audio, ori_sr=sampling_rate, target_sr=self.sampling_rate)
-
-        input_values = self.feat_extractor(audio, sampling_rate=self.sampling_rate, return_tensors="pt").input_values.squeeze()
-
-        with torch.inference_mode():
-            encoded_audio = self.model(input_values.to(self.device))['last_hidden_state']
+        encoded_audio = self.encode_audio(input_values)["last_hidden_state"]
 
         if not self.check_encoded_audio(encoded_audio):
             raise ValueError("Invalid encoded audio")
