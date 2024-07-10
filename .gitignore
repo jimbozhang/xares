@@ -168,3 +168,4 @@ cython_debug/
 
 # Debug
 debug*
+test.py
