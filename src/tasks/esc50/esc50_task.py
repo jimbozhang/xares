@@ -1,4 +1,6 @@
 import json
+import copy
+import numpy as np
 from dataclasses import dataclass
 from typing import List
 
@@ -18,7 +20,7 @@ from xares.utils import download_file, mkdir_if_not_exists, unzip_file
 class ESC50Task(TaskBase):
     folds = range(1, 6)  # This dataset requires 5-fold validation in evaluation
     save_encoded_per_batches = 1000  # If OOM, reduce this number
-    batch_size = 16
+    batch_size = 32
     trim_length = 220_500
     output_dim = 50
 
@@ -30,12 +32,7 @@ class ESC50Task(TaskBase):
         self.checkpoint_dir = self.env_dir / "checkpoints"
         self.ckpt_path = self.checkpoint_dir / "best_model.pt"
 
-        self.wds_encoded_training_fold_k = {
-            1: f"{self.env_dir}/" + "wds-encoded-fold-{02..05}.tar",
-            2: f"{self.env_dir}/" + "wds-encoded-fold-{01345}.tar",
-            3: f"{self.env_dir}/" + "wds-encoded-fold-{01245}.tar",
-            4: f"{self.env_dir}/" + "wds-encoded-fold-{01235}.tar",
-        }
+        self.wds_encoded_training_fold_k = {fold: [f"{self.env_dir}/wds-encoded-fold-0{f}.tar" for f in self.folds if f != fold] for fold in self.folds}
 
     def make_audio_tar(self):
         # Download and extract ESC-50 dataset
@@ -101,7 +98,7 @@ class ESC50Task(TaskBase):
             batch_buf = []
             with TarWriter(wds_encoded_path.as_posix()) as ostream:
                 for batch, label, keys in tqdm(dl):
-                    encoded_batch = self.encoder(batch, 48_000)
+                    encoded_batch = self.encoder(batch, 44_100)
                     batch_buf.append([encoded_batch, label, keys])
 
                     if len(batch_buf) >= self.save_encoded_per_batches:
@@ -115,9 +112,16 @@ class ESC50Task(TaskBase):
         self.make_encoded_tar()
 
         # k-fold:
-        k = 1
-        self.train_mlp(
-            self.wds_encoded_training_fold_k[k],
-            self.wds_encoded_paths_dict[k].as_posix(),
-        )
-        self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], load_ckpt=True)
+        model = copy.deepcopy(self.model)
+        acc = []
+        for k in self.folds:
+            self.train_mlp(
+                self.wds_encoded_training_fold_k[k],
+                self.wds_encoded_paths_dict[k].as_posix(),
+            )
+            acc.append(self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], load_ckpt=True))
+            self.model = copy.deepcopy(model).to(self.encoder.device)
+        
+        for k in range(len(self.folds)):
+            logger.info(f"Fold {k+1} accuracy: {acc[k]}")
+        logger.info(f"The averaged accuracy of 5 folds is: {np.mean(acc)}")
