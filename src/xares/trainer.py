@@ -18,7 +18,8 @@ class Trainer:
     accelerator = Accelerator()
     criterion: str = "CrossEntropyLoss"
     optimizer: str = "Adam"
-    lr: float = 0.001
+    lr: float = 3e-3
+    max_epochs: int = 10
     checkpoint_dir: str = "checkpoints"
     best_ckpt_path: str = None
 
@@ -36,7 +37,7 @@ class Trainer:
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(self.validation_step)
 
-        torch.multiprocessing.set_start_method("spawn")
+        torch.multiprocessing.set_start_method("spawn", force=True)
 
     @classmethod
     def decode_wds_batch(self, batch: Tuple):
@@ -60,7 +61,7 @@ class Trainer:
             y_pred = self.model(x)
             return y_pred, y
 
-    def run(self, dl_train, dl_dev, max_epochs=10):
+    def run(self, dl_train, dl_dev):
         trainer = Engine(self.train_step)
         evaluator = Engine(self.validation_step)
 
@@ -96,7 +97,7 @@ class Trainer:
         trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpoint_handler, {"model": self.model})
 
         logger.info("Trainer Run.")
-        trainer.run(dl_train, max_epochs=max_epochs)
+        trainer.run(dl_train, self.max_epochs)
 
 
 def inference(model, dl_eval):
