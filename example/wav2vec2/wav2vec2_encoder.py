@@ -5,12 +5,15 @@ from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
 
 from xares.audio_encoder_base import AudioEncoderBase
 
+
 @dataclass
 class Wav2vec2Encoder(AudioEncoderBase):
-    model_name = "facebook/wav2vec2-large-100k-voxpopuli" #"facebook/wav2vec2-base-960h"
+    model_name = "facebook/wav2vec2-large-100k-voxpopuli"  # "facebook/wav2vec2-base-960h"
     cache_dir = "pretrained/"
-    if "base" in model_name: output_dim = 768
-    elif "large" in model_name: output_dim = 1024
+    if "base" in model_name:
+        output_dim = 768
+    elif "large" in model_name:
+        output_dim = 1024
 
     def __post_init__(self):
         self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(self.model_name, cache_dir=self.cache_dir)

@@ -53,7 +53,7 @@ class TaskBase(ABC):
 
         trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir)
 
-        ds_train = EmbeddingWebdataset(train_url,shuffle=2000)
+        ds_train = EmbeddingWebdataset(train_url, shuffle=2000)
         dl_train = WebLoader(ds_train, batch_size=self.batch_size, num_workers=self.num_training_workers)
 
         ds_val = EmbeddingWebdataset(validation_url)
