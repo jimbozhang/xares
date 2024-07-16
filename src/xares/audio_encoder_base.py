@@ -15,7 +15,7 @@ class AudioEncoderBase(ABC):
     sampling_rate = 16_000
     output_dim = 0
     resample_warned = False
-    device = Accelerator().device
+    device = 'cuda:1'#Accelerator().device
 
     def __post_init__(self):
         self.model.to(self.device)

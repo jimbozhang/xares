@@ -22,6 +22,8 @@ class Trainer:
     max_epochs: int = 10
     checkpoint_dir: str = "checkpoints"
     best_ckpt_path: str = None
+    ckpt_name: str = 'best_model.pt'
+    device = accelerator.device
 
     def __post_init__(self):
         try:
@@ -37,12 +39,12 @@ class Trainer:
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(self.validation_step)
 
-        torch.multiprocessing.set_start_method("spawn", force=True)
+        self.model.to(self.device)
 
     @classmethod
     def decode_wds_batch(self, batch: Tuple):
         x, y, _ = batch
-        return x.mean(1), y["target"].to(self.accelerator.device)
+        return x.mean(1), y["target"].to(self.device)
 
     def train_step(self, engine, batch):
         self.model.train()
@@ -89,7 +91,7 @@ class Trainer:
 
         checkpoint_handler = ModelCheckpoint(
             dirname=self.checkpoint_dir,
-            filename_pattern="best_model.pt",
+            filename_pattern=self.ckpt_name,
             n_saved=1,
             create_dir=True,
             require_empty=False,
@@ -109,6 +111,7 @@ def inference(model, dl_eval):
         tqdm_dataloader = tqdm(dl_eval, desc="Evaluating")
         for batch in tqdm_dataloader:
             x, y = Trainer.decode_wds_batch(batch)
+            model.to(x.device)
             y_pred = model(x)
             all_preds.append(y_pred)
             all_targets.append(y)

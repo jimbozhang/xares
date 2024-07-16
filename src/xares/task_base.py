@@ -25,8 +25,10 @@ class TaskBase(ABC):
     encoder: AudioEncoderBase = None
     wds_audio_paths_dict = {}
     wds_encoded_paths_dict = {}
-    num_training_workers: int = 0
-    num_validation_workers: int = 0
+    num_training_workers: int = 4
+    num_validation_workers: int = 4
+
+    torch.multiprocessing.set_start_method("spawn", force=True)
 
     @property
     def env_dir(self):
@@ -51,7 +53,7 @@ class TaskBase(ABC):
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
             return
 
-        trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir)
+        trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir, ckpt_name=self.ckpt_name)
 
         ds_train = EmbeddingWebdataset(train_url,shuffle=2000)
         dl_train = WebLoader(ds_train, batch_size=self.batch_size, num_workers=self.num_training_workers)
@@ -63,16 +65,14 @@ class TaskBase(ABC):
 
     def evaluate_mlp(self, eval_url: str, metric: str = "Accuracy", load_ckpt: bool = False):
         if load_ckpt:
-            ckpt_path = self.checkpoint_dir / "best_model.pt"
-
-            if ckpt_path.exists():
-                self.model.load_state_dict(torch.load(ckpt_path))
-                logger.info(f"Loaded model parameters from {ckpt_path}")
+            if self.ckpt_path.exists():
+                self.model.load_state_dict(torch.load(self.ckpt_path))
+                logger.info(f"Loaded model parameters from {self.ckpt_path}")
             else:
-                logger.warning(f"No checkpoint found at {ckpt_path}. Skip loading.")
+                logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
         ds = EmbeddingWebdataset(eval_url)
-        dl = WebLoader(ds, batch_size=self.batch_size, num_workers=0)
+        dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_validation_workers)
         preds, labels = inference(self.model, dl)
 
         try:
