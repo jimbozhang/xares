@@ -48,7 +48,7 @@ class TaskBase(ABC):
     def make_encoded_tar(self):
         pass
 
-    def train_mlp(self, train_url: list, validation_url: str):
+    def train_mlp(self, train_url: list, validation_url: list):
         if not self.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
             return
@@ -58,12 +58,12 @@ class TaskBase(ABC):
         ds_train = EmbeddingWebdataset(train_url,shuffle=2000)
         dl_train = WebLoader(ds_train, batch_size=self.batch_size, num_workers=self.num_training_workers)
 
-        ds_val = EmbeddingWebdataset(validation_url)
+        ds_val = EmbeddingWebdataset(validation_url,shuffle=2000)
         dl_val = WebLoader(ds_val, batch_size=self.batch_size, num_workers=self.num_validation_workers)
 
         trainer.run(dl_train, dl_val)
 
-    def evaluate_mlp(self, eval_url: str, metric: str = "Accuracy", load_ckpt: bool = False):
+    def evaluate_mlp(self, eval_url: list, metric: str = "Accuracy", load_ckpt: bool = False):
         if load_ckpt:
             if self.ckpt_path.exists():
                 self.model.load_state_dict(torch.load(self.ckpt_path))
@@ -71,7 +71,7 @@ class TaskBase(ABC):
             else:
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
-        ds = EmbeddingWebdataset(eval_url)
+        ds = EmbeddingWebdataset(eval_url,shuffle=2000)
         dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_validation_workers)
         preds, labels = inference(self.model, dl)
 
