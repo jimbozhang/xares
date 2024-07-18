@@ -25,6 +25,7 @@ class ESC50Task(TaskBase):
     batch_size = 32
     trim_length = 220_500
     output_dim = 50
+    metric = "accuracy"
 
     def __post_init__(self):
         self.ori_data_root = self.env_dir / "ESC-50-master"

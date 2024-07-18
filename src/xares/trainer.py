@@ -26,7 +26,6 @@ class Trainer:
     metric: str = "accuracy"
     best_metric: float = 0.0
     save_model: bool = True
-    device = accelerator.device
 
     def __post_init__(self):
         try:
@@ -45,7 +44,7 @@ class Trainer:
     @classmethod
     def decode_wds_batch(self, batch: Tuple):
         x, y, _ = batch
-        return x.mean(1), y["target"].to(self.device)
+        return x.mean(1), y["target"].to(self.accelerator.device)
 
     def train_step(self, engine, batch):
         self.model.train()
