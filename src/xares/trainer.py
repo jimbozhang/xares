@@ -23,6 +23,8 @@ class Trainer:
     checkpoint_dir: str = "checkpoints"
     best_ckpt_path: str = None
     ckpt_name: str = 'best_model.pt'
+    best_metric: float = 0.0
+    save_model: bool = True
     device = accelerator.device
 
     def __post_init__(self):
@@ -81,6 +83,11 @@ class Trainer:
             logger.info(
                 f"Epoch: {trainer.state.epoch}  mAP: {metrics['mAP']:.3f} Acc: {metrics['accuracy']:.3f} Avg loss: {metrics['loss']:.5f}"
             )
+            if metrics['accuracy']>self.best_metric:
+                self.best_metric = metrics['accuracy']
+                self.save_model=True
+            else:
+                self.save_mode=False
 
         from ignite.handlers import ModelCheckpoint
 
@@ -91,7 +98,11 @@ class Trainer:
             create_dir=True,
             require_empty=False,
         )
-        self.ignite_trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpoint_handler, {"model": self.model})
+        @self.ignite_trainer.on(Events.EPOCH_COMPLETED)
+        def save_best_model(trainer):
+            if self.save_model:
+                logger.info(f"Epoch: {trainer.state.epoch} save checkpoint")
+                checkpoint_handler(trainer, {"model": self.model})
 
         logger.info("Trainer Run.")
         self.ignite_trainer.run(dl_train, self.max_epochs)
