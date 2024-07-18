@@ -55,10 +55,10 @@ class TaskBase(ABC):
 
         trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir, ckpt_name=self.ckpt_name, metric=metric)
 
-        ds_train = EmbeddingWebdataset(train_url,shuffle=2000)
+        ds_train = EmbeddingWebdataset(train_url, shuffle=2000)
         dl_train = WebLoader(ds_train, batch_size=self.batch_size, num_workers=self.num_training_workers)
 
-        ds_val = EmbeddingWebdataset(validation_url,shuffle=2000)
+        ds_val = EmbeddingWebdataset(validation_url, shuffle=2000)
         dl_val = WebLoader(ds_val, batch_size=self.batch_size, num_workers=self.num_validation_workers)
 
         trainer.run(dl_train, dl_val)
@@ -71,8 +71,8 @@ class TaskBase(ABC):
             else:
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
-        ds = EmbeddingWebdataset(eval_url,shuffle=2000)
-        dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_validation_workers)
+        ds = EmbeddingWebdataset(eval_url, shuffle=2000)
+        dl = WebLoader(ds, batch_size=self.batch_size, num_workers=0)
         preds, labels = inference(self.model, dl)
 
         try:
