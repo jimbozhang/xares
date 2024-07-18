@@ -168,4 +168,5 @@ cython_debug/
 
 # Debug
 debug*
-test.py
+pretrained*
+test*

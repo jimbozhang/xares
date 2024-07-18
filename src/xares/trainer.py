@@ -22,6 +22,10 @@ class Trainer:
     max_epochs: int = 10
     checkpoint_dir: str = "checkpoints"
     best_ckpt_path: str = None
+    ckpt_name: str = "best_model.pt"
+    metric: str = "accuracy"
+    best_metric: float = 0.0
+    save_model: bool = True
 
     def __post_init__(self):
         try:
@@ -36,8 +40,6 @@ class Trainer:
 
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(self.validation_step)
-
-        torch.multiprocessing.set_start_method("spawn", force=True)
 
     @classmethod
     def decode_wds_batch(self, batch: Tuple):
@@ -62,42 +64,49 @@ class Trainer:
             return y_pred, y
 
     def run(self, dl_train, dl_dev):
-        trainer = Engine(self.train_step)
-        evaluator = Engine(self.validation_step)
-
         self.model, self.optimizer, dl_train, dl_dev = self.accelerator.prepare(
             self.model, self.optimizer, dl_train, dl_dev
         )
 
         metrics = {"mAP": 100 * AveragePrecision(), "loss": Loss(self.criterion), "accuracy": Accuracy()}
         for name, metric in metrics.items():
-            metric.attach(evaluator, name)
+            metric.attach(self.ignite_evaluator, name)
 
-        @trainer.on(Events.ITERATION_COMPLETED(every=10))
+        @self.ignite_trainer.on(Events.ITERATION_COMPLETED(every=10))
         def log_training_loss(trainer):
             logger.info(f"Epoch[{trainer.state.epoch}] Loss: {trainer.state.output:.5f}")
 
-        @trainer.on(Events.EPOCH_COMPLETED)
+        @self.ignite_trainer.on(Events.EPOCH_COMPLETED)
         def log_validation_results(trainer):
-            evaluator.run(dl_dev)
-            metrics = evaluator.state.metrics
+            self.ignite_evaluator.run(dl_dev)
+            metrics = self.ignite_evaluator.state.metrics
             logger.info(
                 f"Epoch: {trainer.state.epoch}  mAP: {metrics['mAP']:.3f} Acc: {metrics['accuracy']:.3f} Avg loss: {metrics['loss']:.5f}"
             )
+            if metrics[self.metric] > self.best_metric:
+                self.best_metric = metrics[self.metric]
+                self.save_model = True
+            else:
+                self.save_model = False
 
         from ignite.handlers import ModelCheckpoint
 
         checkpoint_handler = ModelCheckpoint(
             dirname=self.checkpoint_dir,
-            filename_pattern="best_model.pt",
+            filename_pattern=self.ckpt_name,
             n_saved=1,
             create_dir=True,
             require_empty=False,
         )
-        trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpoint_handler, {"model": self.model})
+
+        @self.ignite_trainer.on(Events.EPOCH_COMPLETED)
+        def save_best_model(trainer):
+            if self.save_model:
+                logger.info(f"Epoch: {trainer.state.epoch} save checkpoint")
+                checkpoint_handler(trainer, {"model": self.model})
 
         logger.info("Trainer Run.")
-        trainer.run(dl_train, self.max_epochs)
+        self.ignite_trainer.run(dl_train, self.max_epochs)
 
 
 def inference(model, dl_eval):
