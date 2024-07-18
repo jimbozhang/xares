@@ -48,12 +48,12 @@ class TaskBase(ABC):
     def make_encoded_tar(self):
         pass
 
-    def train_mlp(self, train_url: list, validation_url: list):
+    def train_mlp(self, train_url: list, validation_url: list, metric: str = "accuracy"):
         if not self.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
             return
 
-        trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir, ckpt_name=self.ckpt_name)
+        trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir, ckpt_name=self.ckpt_name, metric=metric)
 
         ds_train = EmbeddingWebdataset(train_url,shuffle=2000)
         dl_train = WebLoader(ds_train, batch_size=self.batch_size, num_workers=self.num_training_workers)

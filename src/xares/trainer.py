@@ -22,7 +22,8 @@ class Trainer:
     max_epochs: int = 10
     checkpoint_dir: str = "checkpoints"
     best_ckpt_path: str = None
-    ckpt_name: str = 'best_model.pt'
+    ckpt_name: str = "best_model.pt"
+    metric: str = "accuracy"
     best_metric: float = 0.0
     save_model: bool = True
     device = accelerator.device
@@ -83,11 +84,11 @@ class Trainer:
             logger.info(
                 f"Epoch: {trainer.state.epoch}  mAP: {metrics['mAP']:.3f} Acc: {metrics['accuracy']:.3f} Avg loss: {metrics['loss']:.5f}"
             )
-            if metrics['accuracy']>self.best_metric:
-                self.best_metric = metrics['accuracy']
+            if metrics[self.metric]>self.best_metric:
+                self.best_metric = metrics[self.metric]
                 self.save_model=True
             else:
-                self.save_mode=False
+                self.save_model=False
 
         from ignite.handlers import ModelCheckpoint
 
