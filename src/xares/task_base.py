@@ -72,7 +72,7 @@ class TaskBase(ABC):
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
         ds = EmbeddingWebdataset(eval_url, shuffle=2000)
-        dl = WebLoader(ds, batch_size=self.batch_size, num_workers=0)
+        dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_validation_workers)
         preds, labels = inference(self.model, dl)
 
         try:
