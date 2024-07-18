@@ -11,6 +11,7 @@ class EmbeddingWebdataset(wds.DataPipeline):
         resample: bool = False,
         batch_size: Optional[int] = None,
     ):
+        assert isinstance(urls, list)
         pipeline: List = [wds.SimpleShardList(urls) if resample is False else wds.ResampledShards(urls)]
         if shuffle is not None:
             # Tar wise shuffle
@@ -31,7 +32,7 @@ class EmbeddingWebdataset(wds.DataPipeline):
                 ]
             )
         else:
-            pipeline.extend([wds.split_by_worker, wds.tarfile_to_samples()])
+            pipeline.extend([wds.split_by_node, wds.split_by_worker, wds.tarfile_to_samples()])
         pipeline.extend([wds.decode(), wds.to_tuple("pth", "json", "__key__")])
         if batch_size is not None:
             pipeline.append(wds.batched(batch_size))

@@ -23,14 +23,14 @@ class ESC50Task(TaskBase):
     batch_size = 32
     trim_length = 220_500
     output_dim = 50
+    metric = "accuracy"
 
     def __post_init__(self):
         self.ori_data_root = self.env_dir / "ESC-50-master"
         self.wds_audio_paths_dict = {fold: self.env_dir / f"wds-audio-fold-0{fold}.tar" for fold in self.folds}
         self.wds_encoded_paths_dict = {fold: self.env_dir / f"wds-encoded-fold-0{fold}.tar" for fold in self.folds}
-        self.model = Mlp(in_features=self.encoder.output_dim, out_features=self.output_dim)
+        self.model = Mlp(in_features=self.encoder.output_dim, out_features=self.output_dim).to(self.encoder.device)
         self.checkpoint_dir = self.env_dir / "checkpoints"
-        self.ckpt_path = self.checkpoint_dir / "best_model.pt"
 
         self.wds_encoded_training_fold_k = {
             fold: [f"{self.env_dir}/wds-encoded-fold-0{f}.tar" for f in self.folds if f != fold] for fold in self.folds
@@ -117,9 +117,11 @@ class ESC50Task(TaskBase):
         model = copy.deepcopy(self.model)
         acc = []
         for k in self.folds:
+            self.ckpt_name = f"fold_0{k}_best_model.pt"
+            self.ckpt_path = self.checkpoint_dir / self.ckpt_name
             self.train_mlp(
                 self.wds_encoded_training_fold_k[k],
-                self.wds_encoded_paths_dict[k].as_posix(),
+                [self.wds_encoded_paths_dict[k].as_posix()],
             )
             acc.append(self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], load_ckpt=True))
             self.model = copy.deepcopy(model).to(self.encoder.device)

@@ -20,6 +20,7 @@ dependencies = [
   "pyyaml",
   "tqdm",
   "webdataset>=0.2.86",
+  "pysoundfile",
 ]
 authors = [
   {name = "Junbo Zhang", email = "zhangjunbo1@xiaomi.com"},
