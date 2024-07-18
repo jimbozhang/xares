@@ -5,6 +5,7 @@ from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
 
 from xares.audio_encoder_base import AudioEncoderBase
 
+
 @dataclass
 class Wav2vec2Encoder(AudioEncoderBase):
     model_name = "facebook/wav2vec2-large-100k-voxpopuli"  # "facebook/wav2vec2-base-960h"
