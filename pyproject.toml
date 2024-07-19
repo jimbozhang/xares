@@ -25,6 +25,7 @@ dependencies = [
 authors = [
   {name = "Junbo Zhang", email = "zhangjunbo1@xiaomi.com"},
   {name = "Heinrich Dinkel", email = "dinkelheinrich@xiaomi.com"},
+  {name = "Chenyu Liu", email = "liuchenyu3@xiaomi.com"},
 ]
 readme = "README.md"
 requires-python = ">=3.9"
