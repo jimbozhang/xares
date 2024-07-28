@@ -25,14 +25,17 @@ class TaskBase(ABC):
     encoder: AudioEncoderBase = None
     wds_audio_paths_dict = {}
     wds_encoded_paths_dict = {}
+    num_encoder_workers: int = 4
     num_training_workers: int = 4
     num_validation_workers: int = 4
-
-    torch.multiprocessing.set_start_method("spawn", force=True)
 
     @property
     def env_dir(self):
         return Path(self.env_root) / self.__class__.__name__.replace("Task", "").lower()
+
+    @property
+    def audio_tar_ready_file(self):
+        return self.env_dir / ".audio_tar_ready"
 
     def run_all(self):
         self.make_audio_tar()
