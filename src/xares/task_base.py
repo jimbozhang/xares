@@ -10,7 +10,7 @@ from webdataset import WebLoader
 
 from xares.audio_encoder_base import AudioEncoderBase
 from xares.dataset import EmbeddingWebdataset
-from xares.trainer import Trainer, inference, MetricType
+from xares.trainer import MetricType, Trainer, inference
 
 
 @dataclass

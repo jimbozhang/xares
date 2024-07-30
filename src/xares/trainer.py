@@ -12,9 +12,10 @@ from torch import nn, optim
 from tqdm import tqdm
 
 MetricType = {
-    "accuracy" : Accuracy,
-    "mAP" : AveragePrecision,
+    "accuracy": Accuracy,
+    "mAP": AveragePrecision,
 }
+
 
 @dataclass
 class Trainer:
