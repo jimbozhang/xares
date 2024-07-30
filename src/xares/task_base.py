@@ -10,7 +10,7 @@ from webdataset import WebLoader
 
 from xares.audio_encoder_base import AudioEncoderBase
 from xares.dataset import EmbeddingWebdataset
-from xares.trainer import Trainer, inference
+from xares.trainer import Trainer, inference, MetricType
 
 
 @dataclass
@@ -75,8 +75,9 @@ class TaskBase(ABC):
         dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_validation_workers)
         preds, labels = inference(self.model, dl)
 
+        metric_func = MetricType[metric].__name__
         try:
-            evaluator = getattr(ignite.metrics, metric)()
+            evaluator = getattr(ignite.metrics, metric_func)()
         except AttributeError:
             raise ValueError(f"Metric {metric} not found in ignite.metrics")
         evaluator.update(output=(preds, labels))

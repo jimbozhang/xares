@@ -123,7 +123,7 @@ class ESC50Task(TaskBase):
                 self.wds_encoded_training_fold_k[k],
                 [self.wds_encoded_paths_dict[k].as_posix()],
             )
-            acc.append(self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], load_ckpt=True))
+            acc.append(self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], metric=self.metric, load_ckpt=True))
             self.model = copy.deepcopy(model).to(self.encoder.device)
 
         for k in range(len(self.folds)):

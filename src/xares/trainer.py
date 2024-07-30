@@ -11,6 +11,10 @@ from loguru import logger
 from torch import nn, optim
 from tqdm import tqdm
 
+MetricType = {
+    "accuracy" : Accuracy,
+    "mAP" : AveragePrecision,
+}
 
 @dataclass
 class Trainer:
@@ -68,7 +72,7 @@ class Trainer:
             self.model, self.optimizer, dl_train, dl_dev
         )
 
-        metrics = {"mAP": 100 * AveragePrecision(), "loss": Loss(self.criterion), "accuracy": Accuracy()}
+        metrics = {"loss": Loss(self.criterion), self.metric: MetricType[self.metric]()}
         for name, metric in metrics.items():
             metric.attach(self.ignite_evaluator, name)
 
@@ -81,7 +85,7 @@ class Trainer:
             self.ignite_evaluator.run(dl_dev)
             metrics = self.ignite_evaluator.state.metrics
             logger.info(
-                f"Epoch: {trainer.state.epoch}  mAP: {metrics['mAP']:.3f} Acc: {metrics['accuracy']:.3f} Avg loss: {metrics['loss']:.5f}"
+                f"Epoch: {trainer.state.epoch}  {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
             )
             if metrics[self.metric] > self.best_metric:
                 self.best_metric = metrics[self.metric]
