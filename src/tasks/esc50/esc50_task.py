@@ -71,6 +71,7 @@ class ESC50Task(TaskBase):
                 logger.info(f"Writing encoded batches for {identifier} ...")
 
             for batch, label, keys in encoded_batches:
+                print(label)
                 for example, label, key in zip(batch, label["target"], keys):
                     sample = {
                         "pth": example,
@@ -85,18 +86,19 @@ class ESC50Task(TaskBase):
                 logger.info(f"Tar file {wds_encoded_path} already exists.")
                 continue
 
-            ds = create_rawaudio_webdataset(
+            dl = create_rawaudio_webdataset(
                 [self.wds_audio_paths_dict[split].as_posix()],
+                batch_size=self.batch_size,
+                num_workers = self.num_training_workers,
                 crop_size=self.trim_length,
                 drop_crops=True,
                 with_json=True,
             )
-            dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_encoder_workers)
 
             logger.info(f"Encoding audio for fold {split} ...")
             batch_buf = []
             with TarWriter(wds_encoded_path.as_posix()) as ostream:
-                for batch, label, keys in tqdm(dl):
+                for batch, keys, label  in tqdm(dl):
                     encoded_batch = self.encoder(batch, 44_100)
                     batch_buf.append([encoded_batch, label, keys])
 

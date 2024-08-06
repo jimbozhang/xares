@@ -4,6 +4,7 @@ import json
 from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union  # type: ignore
+from loguru import logger
 
 import numpy as np
 import torch
@@ -266,7 +267,6 @@ class BalancedDatasetSampler(wds.DataPipeline, wds.compat.FluidInterface):
 
 def expand_with_brace(lists: List[str]):
     import braceexpand
-
     r = []
     for l in lists:
         if "*" in l:
@@ -520,11 +520,8 @@ def write_audio_tar(audio_paths: List[str], labels: List, tar_path: str, num_sha
         shard_labels = labels[start_index:end_index]
 
         sharded_tar_path = tar_path.replace("*", f"0{shard:05d}")
-        if not force and sharded_tar_path.exists():
+        if not force and Path(sharded_tar_path).exists():
             logger.info(f"Tar file {sharded_tar_path} already exists.")
-            continue
-        if not force and sharded_tar_path.exists():
-            logger.info(f"Tar file {wds_audio_path} already exists.")
             continue
 
         with wds.TarWriter(sharded_tar_path) as ostream:

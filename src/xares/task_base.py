@@ -25,9 +25,11 @@ class TaskBase(ABC):
     encoder: AudioEncoderBase = None
     wds_audio_paths_dict = {}
     wds_encoded_paths_dict = {}
-    num_encoder_workers: int = 4
-    num_training_workers: int = 4
-    num_validation_workers: int = 4
+    num_encoder_workers: int = 0
+    num_training_workers: int = 0
+    num_validation_workers: int = 0
+
+    torch.multiprocessing.set_start_method("spawn", force=True)
 
     @property
     def env_dir(self):
