@@ -58,8 +58,18 @@ X-ARES is a toolkit for training, evaluating, and exporting audio encoders for v
 
 ## Installation
 
+X-ARES is available on [PyPI](https://pypi.org/project/xares/). You can install it via pip.
+
 ```bash
 pip install xares
+```
+
+For development, you can clone the repository and install the package in editable mode.
+
+```bash
+git clone <this-repo>
+cd xares
+pip install -e .[examples]
 ```
 
 ## Configure your machine/cluster for training
@@ -106,10 +116,7 @@ Another example could be found at `example/wav2vec2/wav2vec2.py`. It is more com
 
 ```python
 from dataclasses import dataclass
-
-from loguru import logger
 from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
-
 from xares.audio_encoder_base import AudioEncoderBase
 
 
