@@ -106,10 +106,7 @@ Another example could be found at `example/wav2vec2/wav2vec2.py`. It is more com
 
 ```python
 from dataclasses import dataclass
-
-from loguru import logger
 from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
-
 from xares.audio_encoder_base import AudioEncoderBase
 
 
