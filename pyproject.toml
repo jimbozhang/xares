@@ -8,7 +8,6 @@ version = "0.0.1a4"
 description = "eXtensive Audio Representation and Evaluation Suite"
 dependencies = [
   "accelerate",
-  "dasheng",
   "fire",
   "loguru",
   "scikit-learn",
@@ -24,6 +23,7 @@ dependencies = [
 ]
 authors = [
   {name = "Junbo Zhang", email = "zhangjunbo1@xiaomi.com"},
+  {name = "Chenyu Liu", email = "liuchenyu3@xiaomi.com"},
   {name = "Heinrich Dinkel", email = "dinkelheinrich@xiaomi.com"},
   {name = "Chenyu Liu", email = "liuchenyu3@xiaomi.com"},
 ]
@@ -35,12 +35,9 @@ license = {file = "LICENSE"}
 Repository = "https://github.com/jimbozhang/xares.git"
 
 [project.optional-dependencies]
-tools = [
-  "black",
-  "isort",
-  "ipykernel",
-  "ipython",
-  "pyright",
+examples = [
+  "dasheng",
+  "transformers",
 ]
 
 [tool.setuptools.packages.find]

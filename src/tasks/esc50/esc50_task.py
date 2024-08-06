@@ -5,13 +5,12 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from dasheng.prepare.wavlist_to_tar import proxy_read
-from dasheng.train.audiowebdataset import Audiowebdataset_Fluid
-from dasheng.train.models import Mlp
 from loguru import logger
 from tqdm import tqdm
 from webdataset import TarWriter, WebLoader
 
+from xares.audiowebdataset import create_rawaudio_webdataset, write_audio_tar
+from xares.models import Mlp
 from xares.task_base import TaskBase
 from xares.utils import download_file, mkdir_if_not_exists, unzip_file
 
@@ -27,8 +26,8 @@ class ESC50Task(TaskBase):
 
     def __post_init__(self):
         self.ori_data_root = self.env_dir / "ESC-50-master"
-        self.wds_audio_paths_dict = {fold: self.env_dir / f"wds-audio-fold-0{fold}.tar" for fold in self.folds}
-        self.wds_encoded_paths_dict = {fold: self.env_dir / f"wds-encoded-fold-0{fold}.tar" for fold in self.folds}
+        self.wds_audio_paths_dict = {fold: self.env_dir / f"wds-audio-fold-{fold}-*.tar" for fold in self.folds}
+        self.wds_encoded_paths_dict = {fold: self.env_dir / f"wds-encoded-fold-{fold}-*.tar" for fold in self.folds}
         self.model = Mlp(in_features=self.encoder.output_dim, out_features=self.output_dim).to(self.encoder.device)
         self.checkpoint_dir = self.env_dir / "checkpoints"
 
@@ -37,6 +36,10 @@ class ESC50Task(TaskBase):
         }
 
     def make_audio_tar(self):
+        if self.audio_tar_ready_file.exists():
+            logger.info(f"Skip making audio tar. {self.audio_tar_ready_file} already exists.")
+            return
+
         # Download and extract ESC-50 dataset
         mkdir_if_not_exists(self.env_dir)
         download_file(
@@ -57,16 +60,10 @@ class ESC50Task(TaskBase):
         assert df.fold.unique().tolist() == list(self.folds)
         for fold in self.folds:
             wds_audio_path = self.wds_audio_paths_dict[fold]
-
-            if not self.force_generate_audio_tar and wds_audio_path.exists():
-                logger.info(f"Tar file {wds_audio_path} already exists.")
-                continue
-
             df_split = df[df.fold == fold].drop(columns=["fold"])
-            with TarWriter(wds_audio_path.as_posix()) as ostream:
-                for _, row in tqdm(df_split.iterrows(), total=len(df_split)):
-                    sample = proxy_read(row.to_dict(), "filename")
-                    ostream.write(sample)
+            write_audio_tar(df_split.filename.tolist(), df_split.target.tolist(), wds_audio_path.as_posix())
+
+        self.audio_tar_ready_file.touch()
 
     def make_encoded_tar(self):
         def write_encoded_batches_to_wds(encoded_batches: List, ostream: TarWriter, identifier: str = None):
@@ -88,13 +85,13 @@ class ESC50Task(TaskBase):
                 logger.info(f"Tar file {wds_encoded_path} already exists.")
                 continue
 
-            ds = Audiowebdataset_Fluid(
+            ds = create_rawaudio_webdataset(
                 [self.wds_audio_paths_dict[split].as_posix()],
                 crop_size=self.trim_length,
                 drop_crops=True,
                 with_json=True,
             )
-            dl = WebLoader(ds, batch_size=self.batch_size, num_workers=1)
+            dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_encoder_workers)
 
             logger.info(f"Encoding audio for fold {split} ...")
             batch_buf = []
