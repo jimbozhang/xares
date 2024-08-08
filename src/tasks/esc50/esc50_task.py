@@ -32,11 +32,11 @@ class ESC50Task(TaskBase):
         self.checkpoint_dir = self.env_dir / "checkpoints"
 
         self.wds_encoded_training_fold_k = {
-            fold: [f"{self.env_dir}/wds-encoded-fold-0{f}.tar" for f in self.folds if f != fold] for fold in self.folds
+            fold: [f"{self.env_dir}/wds-encoded-fold-{f}-*.tar" for f in self.folds if f != fold] for fold in self.folds
         }
 
     def make_audio_tar(self):
-        if self.audio_tar_ready_file.exists():
+        if not self.force_generate_audio_tar and self.audio_tar_ready_file.exists():
             logger.info(f"Skip making audio tar. {self.audio_tar_ready_file} already exists.")
             return
 
@@ -61,50 +61,57 @@ class ESC50Task(TaskBase):
         for fold in self.folds:
             wds_audio_path = self.wds_audio_paths_dict[fold]
             df_split = df[df.fold == fold].drop(columns=["fold"])
-            write_audio_tar(df_split.filename.tolist(), df_split.target.tolist(), wds_audio_path.as_posix())
+            write_audio_tar(
+                df_split.filename.tolist(),
+                df_split.target.tolist(),
+                wds_audio_path.as_posix(),
+                force=self.force_generate_audio_tar,
+            )
 
         self.audio_tar_ready_file.touch()
 
-    def make_encoded_tar(self):
-        def write_encoded_batches_to_wds(encoded_batches: List, ostream: TarWriter, identifier: str = None):
-            if identifier is not None:
-                logger.info(f"Writing encoded batches for {identifier} ...")
+    def make_encoded_tar(self, num_shards: int = 20):
+        def write_encoded_batches_to_wds(encoded_batches: List, ostream: TarWriter):
 
             for batch, label, keys in encoded_batches:
-                for example, label, key in zip(batch, label["target"], keys):
+                for example, label, key in zip(batch, label, keys):
                     sample = {
                         "pth": example,
-                        "json": json.dumps({"target": label.item()}).encode("utf-8"),
+                        "json": json.dumps({"target": label["label"]}).encode("utf-8"),
                         "__key__": key,
                     }
                     ostream.write(sample)
 
-        for split in self.wds_audio_paths_dict:
-            wds_encoded_path = self.wds_encoded_paths_dict[split]
-            if not self.force_generate_encoded_tar and wds_encoded_path.exists():
-                logger.info(f"Tar file {wds_encoded_path} already exists.")
+        for fold in self.folds:
+            if not self.force_generate_encoded_tar and self.encoded_tar_ready_file.exists():
+                logger.info(f"Skip making encoded tar. {self.encoded_tar_ready_file} already exists.")
                 continue
 
-            ds = create_rawaudio_webdataset(
-                [self.wds_audio_paths_dict[split].as_posix()],
-                crop_size=self.trim_length,
-                drop_crops=True,
-                with_json=True,
-            )
-            dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_encoder_workers)
+            logger.info(f"Encoding audio for fold {fold} ...")
+            for shard in range(num_shards):
+                sharded_tar_path = self.wds_audio_paths_dict[fold].as_posix().replace("*", f"0{shard:05d}")
+                dl = create_rawaudio_webdataset(
+                    [sharded_tar_path],
+                    batch_size=self.batch_size,
+                    num_workers=self.num_encoder_workers,
+                    crop_size=self.trim_length,
+                    with_json=True,
+                )
 
-            logger.info(f"Encoding audio for fold {split} ...")
-            batch_buf = []
-            with TarWriter(wds_encoded_path.as_posix()) as ostream:
-                for batch, label, keys in tqdm(dl):
-                    encoded_batch = self.encoder(batch, 44_100)
-                    batch_buf.append([encoded_batch, label, keys])
+                batch_buf = []
+                sharded_encoded_tar_path = self.wds_encoded_paths_dict[fold].as_posix().replace("*", f"0{shard:05d}")
+                with TarWriter(sharded_encoded_tar_path) as ostream:
+                    for batch, length, label, keys in dl:
+                        encoded_batch = self.encoder(batch, 44_100)
+                        batch_buf.append([encoded_batch, label, keys])
 
-                    if len(batch_buf) >= self.save_encoded_per_batches:
-                        write_encoded_batches_to_wds(batch_buf, ostream, identifier=f"fold-{split}")
-                        batch_buf.clear()
-                if len(batch_buf) > 0:
-                    write_encoded_batches_to_wds(batch_buf, ostream, identifier=f"fold-{split}")
+                        if len(batch_buf) >= self.save_encoded_per_batches:
+                            write_encoded_batches_to_wds(batch_buf, ostream)
+                            batch_buf.clear()
+                    if len(batch_buf) > 0:
+                        write_encoded_batches_to_wds(batch_buf, ostream)
+
+        self.encoded_tar_ready_file.touch()
 
     def run_all(self):
         self.make_audio_tar()
@@ -120,7 +127,9 @@ class ESC50Task(TaskBase):
                 self.wds_encoded_training_fold_k[k],
                 [self.wds_encoded_paths_dict[k].as_posix()],
             )
-            acc.append(self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], load_ckpt=True))
+            acc.append(
+                self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], metric=self.metric, load_ckpt=True)
+            )
             self.model = copy.deepcopy(model).to(self.encoder.device)
 
         for k in range(len(self.folds)):

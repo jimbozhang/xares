@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torchaudio
 import webdataset as wds
+from loguru import logger
 
 
 def db_to_linear(scalar: float) -> float:
@@ -244,6 +245,42 @@ class Audiowebdataset(wds.DataPipeline):
         super().__init__(pipeline)
 
 
+class EmbeddingWebdataset(wds.DataPipeline):
+    def __init__(
+        self,
+        urls,
+        shuffle: Optional[int] = None,
+        resample: bool = False,
+        batch_size: Optional[int] = None,
+    ):
+        assert isinstance(urls, list)
+        pipeline: List = [wds.SimpleShardList(urls) if resample is False else wds.ResampledShards(urls)]
+        if shuffle is not None:
+            # Tar wise shuffle
+            pipeline.extend(
+                [
+                    wds.detshuffle(
+                        bufsize=shuffle,
+                        initial=shuffle // 4,
+                    ),
+                    wds.split_by_node,
+                    wds.split_by_worker,
+                    # at this point, we have an iterator over the shards assigned to each worker at each node
+                    wds.tarfile_to_samples(handler=wds.warn_and_continue),
+                    wds.shuffle(
+                        bufsize=shuffle,
+                        initial=shuffle // 4,
+                    ),
+                ]
+            )
+        else:
+            pipeline.extend([wds.split_by_node, wds.split_by_worker, wds.tarfile_to_samples()])
+        pipeline.extend([wds.decode(), wds.to_tuple("pth", "json", "__key__")])
+        if batch_size is not None:
+            pipeline.append(wds.batched(batch_size))
+        super().__init__(pipeline)
+
+
 # Can also replace with wds.Randomix
 class BalancedDatasetSampler(wds.DataPipeline, wds.compat.FluidInterface):
 
@@ -324,6 +361,7 @@ def create_rawaudio_webdataset(
     drop_clipped: bool = False,
     target_sample_rate: Optional[int] = None,
     crop_size: Optional[int] = None,
+    with_json: bool = False,
     balanced_samper: Optional[bool] = False,
     num_workers: int = 4,
     training: bool = False,
@@ -335,7 +373,11 @@ def create_rawaudio_webdataset(
         target_sample_rate=target_sample_rate,
         resample=resample,
         batch_size=batch_size,
-        rename_keys=dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", json="json"),
+        rename_keys=(
+            dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", json="json", filename="__key__")
+            if with_json
+            else dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", filename="__key__")
+        ),
         merge_function=partial(
             _seq_crop_audio, drop_clipped=drop_clipped, random_gain=random_gain, mono=True, crop_size=crop_size
         ),
@@ -520,11 +562,8 @@ def write_audio_tar(audio_paths: List[str], labels: List, tar_path: str, num_sha
         shard_labels = labels[start_index:end_index]
 
         sharded_tar_path = tar_path.replace("*", f"0{shard:05d}")
-        if not force and sharded_tar_path.exists():
+        if not force and Path(sharded_tar_path).exists():
             logger.info(f"Tar file {sharded_tar_path} already exists.")
-            continue
-        if not force and sharded_tar_path.exists():
-            logger.info(f"Tar file {wds_audio_path} already exists.")
             continue
 
         with wds.TarWriter(sharded_tar_path) as ostream:
