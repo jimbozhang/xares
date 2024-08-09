@@ -1,4 +1,3 @@
-from abc import ABC
 from typing import Optional
 
 import torch.nn as nn
@@ -6,7 +5,7 @@ import torch.nn as nn
 from xares.audio_encoder_base import AudioEncoderBase
 
 
-class ModelBase(ABC, nn.Module):
+class ModelBase(nn.Module):
     def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Linear):
