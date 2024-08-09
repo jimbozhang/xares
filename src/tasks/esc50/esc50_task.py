@@ -18,7 +18,7 @@ from xares.utils import download_file, mkdir_if_not_exists, unzip_file
 @dataclass
 class ESC50Task(TaskBase):
     folds = range(1, 6)  # This dataset requires 5-fold validation in evaluation
-    save_encoded_per_batches = 1000  # If OOM, reduce this number
+    save_encoded_per_batches = 1000
     batch_size = 32
     trim_length = 220_500
     output_dim = 50
@@ -109,16 +109,16 @@ class ESC50Task(TaskBase):
                 if len(batch_buf) > 0:
                     write_encoded_batches_to_wds(batch_buf, ostream, identifier=f"fold-{split}")
 
-    def run_all(self):
+    def run_all(self) -> float:
         self.make_audio_tar()
         self.make_encoded_tar()
 
         # k-fold:
-        model = copy.deepcopy(self.model)
         acc = []
         for k in self.folds:
-            self.ckpt_name = f"fold_0{k}_best_model.pt"
+            self.ckpt_name = f"fold_{k}_best_model.pt"
             self.ckpt_path = self.checkpoint_dir / self.ckpt_name
+            self.model.reinit()
             self.train_mlp(
                 self.wds_encoded_training_fold_k[k],
                 [self.wds_encoded_paths_dict[k].as_posix()],
@@ -126,8 +126,11 @@ class ESC50Task(TaskBase):
             acc.append(
                 self.evaluate_mlp([self.wds_encoded_paths_dict[k].as_posix()], metric=self.metric, load_ckpt=True)
             )
-            self.model = copy.deepcopy(model).to(self.encoder.device)
 
         for k in range(len(self.folds)):
             logger.info(f"Fold {k+1} accuracy: {acc[k]}")
-        logger.info(f"The averaged accuracy of 5 folds is: {np.mean(acc)}")
+
+        avg_acc = np.mean(acc)
+        logger.info(f"The averaged accuracy of 5 folds is: {avg_acc}")
+
+        return avg_acc

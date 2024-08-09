@@ -17,7 +17,7 @@ from xares.utils import mkdir_if_not_exists
 @dataclass
 class CREMADTask(TaskBase):
     splits = ["test", "valid", "train"]
-    save_encoded_per_batches = 1000  # If OOM, reduce this number
+    save_encoded_per_batches = 1000
     batch_size = 32
     trim_length = 96_000
     output_dim = 6
@@ -137,7 +137,7 @@ class CREMADTask(TaskBase):
                 if len(batch_buf) > 0:
                     write_encoded_batches_to_wds(batch_buf, ostream, identifier=split)
 
-    def run_all(self):
+    def run_all(self) -> float:
         self.make_audio_tar()
         self.make_encoded_tar()
 
@@ -150,3 +150,5 @@ class CREMADTask(TaskBase):
         )
         acc = self.evaluate_mlp([self.wds_encoded_paths_dict["test"].as_posix()], metric=self.metric, load_ckpt=True)
         logger.info(f"Accuracy: {acc}")
+
+        return acc
