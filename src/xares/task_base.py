@@ -8,7 +8,7 @@ from loguru import logger
 from webdataset import WebLoader
 
 from xares.audio_encoder_base import AudioEncoderBase
-from xares.dataset import EmbeddingWebdataset
+from xares.audiowebdataset import EmbeddingWebdataset, expand_with_brace
 from xares.models import ModelBase
 from xares.trainer import MetricType, Trainer, inference
 
@@ -26,9 +26,9 @@ class TaskBase(ABC):
     wds_audio_paths_dict = {}
     wds_encoded_paths_dict = {}
 
-    num_encoder_workers: int = 0
-    num_training_workers: int = 0
-    num_validation_workers: int = 0
+    num_encoder_workers: int = 8
+    num_training_workers: int = 8
+    num_validation_workers: int = 8
 
     model: ModelBase = None
 
@@ -37,10 +37,14 @@ class TaskBase(ABC):
         return Path(self.env_root) / self.__class__.__name__.replace("Task", "").lower()
 
     @property
-    def audio_tar_ready_file(self) -> Path:
+    def audio_tar_ready_file(self):
         return self.env_dir / ".audio_tar_ready"
 
-    def run_all(self) -> None:
+    @property
+    def encoded_tar_ready_file(self):
+        return self.env_dir / ".encoded_tar_ready"
+
+    def run_all(self):
         self.make_audio_tar()
         self.make_encoded_tar()
         self.train_mlp(self.wds_encoded_paths_dict["train"], self.wds_encoded_paths_dict["validation"])
@@ -62,10 +66,10 @@ class TaskBase(ABC):
         assert self.model is not None
         trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir, ckpt_name=self.ckpt_name, metric=self.metric)
 
-        ds_train = EmbeddingWebdataset(train_url, shuffle=2000)
+        ds_train = EmbeddingWebdataset(expand_with_brace(train_url), shuffle=2000)
         dl_train = WebLoader(ds_train, batch_size=self.batch_size, num_workers=self.num_training_workers)
 
-        ds_val = EmbeddingWebdataset(validation_url, shuffle=2000)
+        ds_val = EmbeddingWebdataset(expand_with_brace(validation_url), shuffle=2000)
         dl_val = WebLoader(ds_val, batch_size=self.batch_size, num_workers=self.num_validation_workers)
 
         trainer.run(dl_train, dl_val)
@@ -78,7 +82,7 @@ class TaskBase(ABC):
             else:
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
-        ds = EmbeddingWebdataset(eval_url, shuffle=2000)
+        ds = EmbeddingWebdataset(expand_with_brace(eval_url), shuffle=2000)
         dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_validation_workers)
         preds, labels = inference(self.model, dl)
 
