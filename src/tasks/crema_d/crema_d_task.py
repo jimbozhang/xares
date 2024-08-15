@@ -27,18 +27,8 @@ class CREMADTask(TaskBase):
         self.ori_data_root = self.env_dir / "CREMA-D"
         self.model = Mlp(in_features=self.encoder.output_dim, out_features=self.output_dim)
         self.checkpoint_dir = self.env_dir / "checkpoints"
-
-        self.wds_audio_paths_dict = {
-            "test": self.env_dir / "wds_audio_test.tar",
-            "valid": self.env_dir / "wds_audio_valid.tar",
-            "train": self.env_dir / "wds_audio_train.tar",
-        }
-
-        self.wds_encoded_paths_dict = {
-            "test": self.env_dir / "wds_encoded_test.tar",
-            "valid": self.env_dir / "wds_encoded_valid.tar",
-            "train": self.env_dir / "wds_encoded_train.tar",
-        }
+        self.wds_audio_paths_dict = {split: self.env_dir / f"wds_audio_{split}.tar" for split in self.splits}
+        self.wds_encoded_paths_dict = {split: self.env_dir / f"wds_encoded_{split}.tar" for split in self.splits}
 
     def make_audio_tar(self):
         if not self.force_generate_audio_tar and self.audio_tar_ready_file.exists():
