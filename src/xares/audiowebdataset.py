@@ -1,6 +1,7 @@
 # Copied from `xiaomitts/common/audiowebdataset.py`
 
 import json
+import random
 from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union  # type: ignore
@@ -90,6 +91,7 @@ def _seq_crop_audio(
     drop_below_db: Optional[float] = None,
     conditional_crop_size: Optional[Union[float, Tuple[float, float]]] = None,
     random_gain: Optional[Tuple[int, int]] = None,
+    remain_random_one_crop: bool = False,
     handler=None,
 ):
     """WebDataset crop filter, yields sequential crops"""
@@ -102,6 +104,9 @@ def _seq_crop_audio(
             continue
         if crop_size is not None:
             crops = crop_or_pad_audio(audio.float(), crop_size=crop_size, pad_last=False)
+            if remain_random_one_crop:
+                crops = list(crops)
+                crops = [crops[random.randint(0, len(crops) - 1)]]
         else:
             crops = [audio.float()]
         if conditional_crop_size is not None:
@@ -366,6 +371,7 @@ def create_rawaudio_webdataset(
     num_workers: int = 4,
     training: bool = False,
     random_gain: Optional[Tuple[int, int]] = None,  # Adds random gain
+    remain_random_one_crop: bool = False,
     **kwargs,
 ):
     dataset_kwargs = dict(
@@ -379,7 +385,12 @@ def create_rawaudio_webdataset(
             else dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", filename="__key__")
         ),
         merge_function=partial(
-            _seq_crop_audio, drop_clipped=drop_clipped, random_gain=random_gain, mono=True, crop_size=crop_size
+            _seq_crop_audio,
+            drop_clipped=drop_clipped,
+            random_gain=random_gain,
+            mono=True,
+            crop_size=crop_size,
+            remain_random_one_crop=remain_random_one_crop,
         ),
     )
     if balanced_samper:
