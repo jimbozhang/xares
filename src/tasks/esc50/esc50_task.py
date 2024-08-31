@@ -1,15 +1,10 @@
-import copy
-import json
 from dataclasses import dataclass
-from typing import List
 
 import numpy as np
 import pandas as pd
 from loguru import logger
-from tqdm import tqdm
-from webdataset import TarWriter, WebLoader
 
-from xares.audiowebdataset import create_rawaudio_webdataset, write_audio_tar
+from xares.audiowebdataset import create_rawaudio_webdataset, write_audio_tar, write_encoded_batches_to_wds
 from xares.models import Mlp
 from xares.task_base import TaskBase
 from xares.utils import download_file, mkdir_if_not_exists, unzip_file
@@ -18,10 +13,10 @@ from xares.utils import download_file, mkdir_if_not_exists, unzip_file
 @dataclass
 class ESC50Task(TaskBase):
     folds = range(1, 6)  # This dataset requires 5-fold validation in evaluation
-    save_encoded_per_batches = 1000
-    batch_size = 32
     trim_length = 220_500
     output_dim = 50
+    save_encoded_per_batches = 2
+    num_shards_rawaudio = 4
     metric = "accuracy"
 
     def __post_init__(self):
@@ -66,50 +61,49 @@ class ESC50Task(TaskBase):
                 df_split.target.tolist(),
                 wds_audio_path.as_posix(),
                 force=self.force_generate_audio_tar,
+                num_shards=self.num_shards_rawaudio,
             )
 
         self.audio_tar_ready_file.touch()
 
-    def make_encoded_tar(self, num_shards: int = 20):
-        def write_encoded_batches_to_wds(encoded_batches: List, ostream: TarWriter):
-
-            for batch, label, keys in encoded_batches:
-                for example, label, key in zip(batch, label, keys):
-                    sample = {
-                        "pth": example,
-                        "json": json.dumps({"target": label["label"]}).encode("utf-8"),
-                        "__key__": key,
-                    }
-                    ostream.write(sample)
+    def make_encoded_tar(self):
+        if not self.force_generate_encoded_tar and self.encoded_tar_ready_file.exists():
+            logger.info(f"Skip making encoded tar. {self.encoded_tar_ready_file} already exists.")
+            return
 
         for fold in self.folds:
-            if not self.force_generate_encoded_tar and self.encoded_tar_ready_file.exists():
-                logger.info(f"Skip making encoded tar. {self.encoded_tar_ready_file} already exists.")
-                continue
-
             logger.info(f"Encoding audio for fold {fold} ...")
-            for shard in range(num_shards):
-                sharded_tar_path = self.wds_audio_paths_dict[fold].as_posix().replace("*", f"0{shard:05d}")
-                dl = create_rawaudio_webdataset(
-                    [sharded_tar_path],
-                    batch_size=self.batch_size,
+
+            dl = create_rawaudio_webdataset(
+                [self.wds_audio_paths_dict[fold].as_posix()],
+                batch_size=self.batch_size_encode,
+                num_workers=self.num_encoder_workers,
+                crop_size=self.trim_length,
+                with_json=True,
+            )
+
+            batch_buf = []
+            shard = 0
+            for batch, _, label, keys in dl:
+                batch = batch.to(self.encoder.device)
+                encoded_batch = self.encoder(batch, 44_100).to("cpu").detach()
+                batch_buf.append([encoded_batch, label, keys])
+
+                if len(batch_buf) >= self.save_encoded_per_batches:
+                    write_encoded_batches_to_wds(
+                        batch_buf,
+                        self.wds_encoded_paths_dict[fold].as_posix().replace("*", f"0{shard:05d}"),
+                        num_workers=self.num_encoder_workers,
+                    )
+                    batch_buf.clear()
+                    shard += 1
+
+            if len(batch_buf) > 0:
+                write_encoded_batches_to_wds(
+                    batch_buf,
+                    self.wds_encoded_paths_dict[fold].as_posix().replace("*", f"0{shard:05d}"),
                     num_workers=self.num_encoder_workers,
-                    crop_size=self.trim_length,
-                    with_json=True,
                 )
-
-                batch_buf = []
-                sharded_encoded_tar_path = self.wds_encoded_paths_dict[fold].as_posix().replace("*", f"0{shard:05d}")
-                with TarWriter(sharded_encoded_tar_path) as ostream:
-                    for batch, length, label, keys in dl:
-                        encoded_batch = self.encoder(batch, 44_100)
-                        batch_buf.append([encoded_batch, label, keys])
-
-                        if len(batch_buf) >= self.save_encoded_per_batches:
-                            write_encoded_batches_to_wds(batch_buf, ostream)
-                            batch_buf.clear()
-                    if len(batch_buf) > 0:
-                        write_encoded_batches_to_wds(batch_buf, ostream)
 
         self.encoded_tar_ready_file.touch()
 
@@ -123,6 +117,7 @@ class ESC50Task(TaskBase):
             self.ckpt_name = f"fold_{k}_best_model.pt"
             self.ckpt_path = self.checkpoint_dir / self.ckpt_name
             self.model.reinit()
+            self.model = self.model.to(self.encoder.device)
             self.train_mlp(
                 self.wds_encoded_training_fold_k[k],
                 [self.wds_encoded_paths_dict[k].as_posix()],

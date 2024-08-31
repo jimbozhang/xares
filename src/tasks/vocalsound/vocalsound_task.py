@@ -4,11 +4,9 @@ import os
 from dataclasses import dataclass
 from typing import List
 
-import numpy as np
 import pandas as pd
 from loguru import logger
-from tqdm import tqdm
-from webdataset import TarWriter, WebLoader
+from webdataset import TarWriter
 
 from xares.audiowebdataset import create_rawaudio_webdataset, write_audio_tar
 from xares.models import Mlp

@@ -17,7 +17,7 @@ from xares.utils import download_file, mkdir_if_not_exists, untar_file
 class LibriSpeechMaleFemaleTask(TaskBase):
     save_encoded_per_batches = 1000  # If OOM, reduce this number
     batch_size = 32
-    trim_length = 100_320  # 33440*3s
+    trim_length = 100_320  # 33440 * 3s
     output_dim = 2
     metric = "accuracy"
 

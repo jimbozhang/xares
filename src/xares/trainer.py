@@ -47,9 +47,11 @@ class Trainer:
         self.ignite_evaluator = Engine(self.validation_step)
 
     @classmethod
-    def decode_wds_batch(self, batch: Tuple):
-        x, y, _ = batch
-        return x.mean(1), y["target"].to(self.accelerator.device)
+    def decode_wds_batch(cls, batch: Tuple):
+        x, _, y, _ = batch
+        x = x.mean(1)
+        y = torch.tensor([y_i["target"] for y_i in y])
+        return x.to(cls.accelerator.device), y.to(cls.accelerator.device)
 
     def train_step(self, engine, batch):
         self.model.train()

@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -5,10 +6,9 @@ from pathlib import Path
 import ignite.metrics
 import torch
 from loguru import logger
-from webdataset import WebLoader
 
 from xares.audio_encoder_base import AudioEncoderBase
-from xares.audiowebdataset import EmbeddingWebdataset, expand_with_brace
+from xares.audiowebdataset import create_embedding_webdataset
 from xares.models import ModelBase
 from xares.trainer import MetricType, Trainer, inference
 
@@ -26,9 +26,12 @@ class TaskBase(ABC):
     wds_audio_paths_dict = {}
     wds_encoded_paths_dict = {}
 
-    num_encoder_workers: int = 8
+    batch_size_encode: int = 16
+    batch_size_train: int = 32
+
+    num_encoder_workers: int = 4
     num_training_workers: int = 8
-    num_validation_workers: int = 8
+    num_validation_workers: int = 0
 
     model: ModelBase = None
 
@@ -45,6 +48,9 @@ class TaskBase(ABC):
         return self.env_dir / ".encoded_tar_ready"
 
     def run_all(self):
+        logging.captureWarnings(True)
+        logging.getLogger("py.warnings").setLevel(logging.ERROR)
+
         self.make_audio_tar()
         self.make_encoded_tar()
         self.train_mlp(self.wds_encoded_paths_dict["train"], self.wds_encoded_paths_dict["validation"])
@@ -66,11 +72,12 @@ class TaskBase(ABC):
         assert self.model is not None
         trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir, ckpt_name=self.ckpt_name, metric=self.metric)
 
-        ds_train = EmbeddingWebdataset(expand_with_brace(train_url), shuffle=2000)
-        dl_train = WebLoader(ds_train, batch_size=self.batch_size, num_workers=self.num_training_workers)
-
-        ds_val = EmbeddingWebdataset(expand_with_brace(validation_url), shuffle=2000)
-        dl_val = WebLoader(ds_val, batch_size=self.batch_size, num_workers=self.num_validation_workers)
+        dl_train = create_embedding_webdataset(
+            train_url, tar_shuffle=2000, batch_size=self.batch_size_train, num_workers=self.num_training_workers
+        )
+        dl_val = create_embedding_webdataset(
+            validation_url, tar_shuffle=2000, batch_size=self.batch_size_train, num_workers=self.num_validation_workers
+        )
 
         trainer.run(dl_train, dl_val)
 
@@ -82,8 +89,9 @@ class TaskBase(ABC):
             else:
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
-        ds = EmbeddingWebdataset(expand_with_brace(eval_url), shuffle=2000)
-        dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_validation_workers)
+        dl = create_embedding_webdataset(
+            eval_url, tar_shuffle=2000, batch_size=self.batch_size_train, num_workers=self.num_validation_workers
+        )
         preds, labels = inference(self.model, dl)
 
         metric_func = MetricType[metric].__name__

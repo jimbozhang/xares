@@ -1,6 +1,7 @@
 # Copied from `xiaomitts/common/audiowebdataset.py`
 
 import json
+import multiprocessing
 import random
 from functools import partial
 from pathlib import Path
@@ -254,27 +255,27 @@ class EmbeddingWebdataset(wds.DataPipeline):
     def __init__(
         self,
         urls,
-        shuffle: Optional[int] = None,
+        tar_shuffle: Optional[int] = None,
         resample: bool = False,
         batch_size: Optional[int] = None,
     ):
         assert isinstance(urls, list)
         pipeline: List = [wds.SimpleShardList(urls) if resample is False else wds.ResampledShards(urls)]
-        if shuffle is not None:
+        if tar_shuffle is not None:
             # Tar wise shuffle
             pipeline.extend(
                 [
                     wds.detshuffle(
-                        bufsize=shuffle,
-                        initial=shuffle // 4,
+                        bufsize=tar_shuffle,
+                        initial=tar_shuffle // 4,
                     ),
                     wds.split_by_node,
                     wds.split_by_worker,
                     # at this point, we have an iterator over the shards assigned to each worker at each node
                     wds.tarfile_to_samples(handler=wds.warn_and_continue),
                     wds.shuffle(
-                        bufsize=shuffle,
-                        initial=shuffle // 4,
+                        bufsize=tar_shuffle,
+                        initial=tar_shuffle // 4,
                     ),
                 ]
             )
@@ -414,43 +415,26 @@ def create_rawaudio_webdataset(
     return dataloader
 
 
-def create_latent_webdataset(
+def create_embedding_webdataset(
     urls: Union[List[str], Dict[str, List[str]]],
     tar_shuffle: Optional[int] = None,
-    resample: Optional[bool] = None,
     batch_size: int = 16,
-    drop_clipped: bool = False,
-    target_sample_rate: Optional[int] = None,
-    crop_size: int = 20,
     balanced_samper: Optional[bool] = False,
     num_workers: int = 4,
     training: bool = False,
-    random_gain: Optional[Tuple[int, int]] = None,  # Adds random gain
-    conditional_crop_size: Optional[float] = None,
     **kwargs,
 ):
     dataset_kwargs = dict(
         tar_shuffle=tar_shuffle,
-        target_sample_rate=target_sample_rate,
-        resample=resample,
         batch_size=batch_size,
-        rename_keys=dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", latent="pth"),
-        map_kwargs=dict(latent=lambda sample: sample.transpose(-2, -1)),
-        merge_function=partial(
-            _seq_crop_latent,
-            drop_clipped=drop_clipped,
-            conditional_crop_size=conditional_crop_size,
-            random_gain=random_gain,
-            crop_size=crop_size,
-        ),
     )
     if balanced_samper:
         assert isinstance(urls, dict)
-        ds = {k: Audiowebdataset(expand_with_brace(train_data), **dataset_kwargs) for k, train_data in urls.items()}
+        ds = {k: EmbeddingWebdataset(expand_with_brace(train_data), **dataset_kwargs) for k, train_data in urls.items()}
         dataset = BalancedDatasetSampler(**ds)
     else:
         assert isinstance(urls, list)
-        dataset = Audiowebdataset(expand_with_brace(urls), **dataset_kwargs)
+        dataset = EmbeddingWebdataset(expand_with_brace(urls), **dataset_kwargs)
     dataloader = wds.WebLoader(
         dataset,
         batch_size=None,
@@ -462,85 +446,6 @@ def create_latent_webdataset(
         batch_size,
         collation_fn=collate_with_lengths_wds,
     )
-    return dataloader
-
-
-def create_gpt_webdataset(
-    urls: Union[List[str], Dict[str, List[str]]],
-    tar_shuffle: Optional[int] = None,
-    resample: Optional[bool] = None,
-    batch_size: int = 16,
-    drop_clipped: Optional[bool] = False,
-    target_sample_rate: Optional[int] = None,
-    balanced_sampler: Optional[bool] = False,
-    num_workers: int = 4,
-    training: bool = False,
-    max_audio_length: float = 15,
-    min_audio_length: float = 3,
-    max_text_length: Optional[int] = None,
-    conditional_crop_size: Union[float, Tuple[float, float]] = 1.5,
-    text_tokenizer: Optional[Callable] = None,
-    **kwargs,
-):
-
-    def filter_lengths(sample):
-        audio, sr = sample["audio"]
-        audio_length = audio.shape[-1] / sr
-        if audio_length > max_audio_length:
-            return False
-        if audio_length < min_audio_length:
-            return False
-        if max_text_length is not None:
-            if len(sample["text"]) > max_text_length:
-                return False
-        return True
-
-    def codes_transform(x):
-        codes = torch.tensor(x["codes"])
-        # Need to transpose for num_codebooks > 1 quantizers
-        if codes.ndim == 2:
-            codes = codes.transpose(-2, -1)
-        return codes
-
-    dataset_kwargs = dict(
-        target_sample_rate=target_sample_rate,
-        resample=resample,
-        tar_shuffle=tar_shuffle,
-        batch_size=batch_size,
-        rename_keys=dict(
-            audio="flac;mp3;sox;wav;m4a;ogg;wma",
-            codes="json",
-            text="json",
-            filename="__key__",
-        ),
-        filter_function=filter_lengths,
-        map_kwargs=dict(
-            # audio=lambda x: x[0],
-            codes=codes_transform,  # Transposing since during padding #263, we need to assert that codes are of shape (B,...,T)
-            # text=text_t
-            text=lambda sample: torch.as_tensor(text_tokenizer(sample["text"])).long(),
-        ),
-        merge_function=partial(
-            _seq_crop_audio, crop_size=None, conditional_crop_size=conditional_crop_size
-        ),  # Returns (audio, )
-    )
-
-    if balanced_sampler:
-        assert isinstance(urls, dict)
-        ds = {k: Audiowebdataset(expand_with_brace(train_data), **dataset_kwargs) for k, train_data in urls.items()}
-        dataset = BalancedDatasetSampler(**ds)
-    else:
-        assert isinstance(urls, list)
-        dataset = Audiowebdataset(expand_with_brace(urls), **dataset_kwargs)
-
-    dataloader = wds.WebLoader(
-        dataset,
-        batch_size=None,
-        num_workers=num_workers,
-    ).unbatched()  # Unbatch to shuffle across workers
-    if training:
-        dataloader = dataloader.shuffle(512)
-    dataloader = dataloader.batched(batch_size, collation_fn=collate_with_lengths_wds)
     return dataloader
 
 
@@ -581,3 +486,25 @@ def write_audio_tar(audio_paths: List[str], labels: List, tar_path: str, num_sha
             for audio_path, label in zip(shard_audio_paths, shard_labels):
                 sample = make_sample(audio_path, label)
                 ostream.write(sample)
+
+
+def batch_to_sample(example, label, key):
+    sample = {
+        "pth": example,
+        "json": json.dumps({"target": label["label"]}).encode("utf-8"),
+        "__key__": key,
+    }
+    return sample
+
+
+def write_encoded_batches_to_wds(encoded_batches: List, tar_path: str, num_workers: int = 0):
+    with wds.TarWriter(tar_path) as ostream:
+        if num_workers == 0:
+            for batch, label, keys in encoded_batches:
+                for return_values in map(batch_to_sample, batch, label, keys):
+                    ostream.write(return_values)
+        else:
+            with multiprocessing.Pool(processes=num_workers) as pool:
+                for batch, label, keys in encoded_batches:
+                    for return_values in pool.starmap(batch_to_sample, zip(batch, label, keys)):
+                        ostream.write(return_values)
