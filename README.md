@@ -2,22 +2,17 @@
 
 X-ARES: eXtensive Audio Representation and Evaluation Suite
 
-This project is still in the early stage of development. The first release is expected to be at August 31, 2024.
+**This project is still in the early stage of development and welcomes contributions, especially in expanding supported tasks and improving robustness.**
 
 ## Introduction
 
-X-ARES is a toolkit for training, evaluating, and exporting audio encoders for various audio tasks. It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/), but offers faster performance, greater flexibility, and enhanced extensibility.
+X-ARES is a toolkit for training, evaluating, and exporting audio encoders for various audio tasks. It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/).
 
-## Roadmap
+## Planned supported tasks
 
-### Features
+Currently, only four tasks (ESC-50, VocalSound, CREMA-D and LibriSpeech-Male-Female) have been implemented. However, adding new tasks is straightforward: it typically only need to implement the audio data download and packaging functions, as manual audio decoding and training implementations are not necessary. We encourage anyone to submit pull requests to expand the set of supported tasks.
 
-- [ ] Basic pipeline for training, evaluating, and exporting
-- [ ] Slurm support
-
-### Planned supported tasks
-
-#### Speech
+### Speech
 
 - Speech Commands V1
 - Speech Commands V2
@@ -34,7 +29,7 @@ X-ARES is a toolkit for training, evaluating, and exporting audio encoders for v
 - DiCOVA
 - speechocean762
 
-#### Environment
+### Environment
 
 - ESC-50
 - FSD50k
@@ -48,7 +43,7 @@ X-ARES is a toolkit for training, evaluating, and exporting audio encoders for v
 - FSD18-Kaggle
 - AudioCaps
 
-#### Music
+### Music
 
 - MAESTRO
 - GTZAN Genre
@@ -72,12 +67,6 @@ cd xares
 pip install -e .[examples]
 ```
 
-## Configure your machine/cluster for training
-
-```plain
-to be done
-```
-
 ## Run with the baseline pretrained audio encoder (Dasheng)
 
 The ESC-50 task is used as an example.
@@ -86,7 +75,7 @@ The ESC-50 task is used as an example.
 from example.dasheng.dasheng_encoder import DashengEncoder
 from tasks.esc50 import esc50_task
 
-task = esc50_task.ESC50Task(env_root="./env", encoder=DashengEncoder(), force_retrain_mlp=True)
+task = esc50_task.ESC50Task(env_root="./env", encoder=DashengEncoder())
 
 task.run_all()
 ```
@@ -147,6 +136,4 @@ class Wav2vec2Encoder(AudioEncoderBase):
 
 ## Add your own task
 
-```plain
-to be done
-```
+To add a new task, refer to existing task implementations for guidance. Essentially, create a task class that inherits from `AudioTaskBase` and implements the `make_audio_tar` method tailored to your chosen dataset, handling data download, preprocessing, and packaging into the required format.
