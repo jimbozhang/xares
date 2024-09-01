@@ -485,6 +485,9 @@ def write_audio_tar(audio_paths: List[str], labels: List, tar_path: str, num_sha
         with wds.TarWriter(sharded_tar_path) as ostream:
             for audio_path, label in zip(shard_audio_paths, shard_labels):
                 sample = make_sample(audio_path, label)
+                if len(sample["wav"]) < 100:
+                    logger.warning(f"Skipping {audio_path} due to short length.")
+                    continue
                 ostream.write(sample)
 
 
