@@ -1,5 +1,3 @@
-from typing import Optional
-
 import torch.nn as nn
 
 from xares.audio_encoder_base import AudioEncoderBase
@@ -33,8 +31,6 @@ class Mlp(ModelBase):
         return x
 
 
-# Havn't tested this, may not work
-# Useful for not freezing the encoder when training the output layer
 class AudioEncoderWithMlpOutput(nn.Module):
     def __init__(self, encoder: AudioEncoderBase, output_dim: int, freeze_encoder: bool = False):
         super().__init__()
