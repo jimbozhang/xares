@@ -16,7 +16,6 @@ class ESC50Task(TaskBase):
     trim_length = 220_500
     output_dim = 50
     save_encoded_per_batches = 2
-    num_shards_rawaudio = 4
 
     def __post_init__(self):
         self.ori_data_root = self.env_dir / "ESC-50-master"
@@ -49,12 +48,11 @@ class ESC50Task(TaskBase):
 
         assert df.fold.unique().tolist() == list(self.splits)
         for fold in self.splits:
-            wds_audio_path = self.wds_audio_paths_dict[fold]
             df_split = df[df.fold == fold].drop(columns=["fold"])
             write_audio_tar(
-                df_split.filename.tolist(),
-                df_split.target.tolist(),
-                wds_audio_path.as_posix(),
+                audio_paths=df_split.filename.tolist(),
+                labels=df_split.target.tolist(),
+                tar_path=self.wds_audio_paths_dict[fold].as_posix(),
                 force=self.force_generate_audio_tar,
                 num_shards=self.num_shards_rawaudio,
             )
@@ -73,8 +71,7 @@ class ESC50Task(TaskBase):
         }
 
         for k in self.splits:
-            self.ckpt_name = f"fold_{k}_best_model.pt"
-            self.ckpt_path = self.checkpoint_dir / self.ckpt_name
+            self.ckpt_path = self.checkpoint_dir / f"fold_{k}_best_model.pt"
             self.model.reinit()
             self.model = self.model.to(self.encoder.device)
             self.train_mlp(

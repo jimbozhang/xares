@@ -75,12 +75,11 @@ class VocalSoundTask(TaskBase):
 
         assert set(df.split.unique().tolist()) == set(self.splits)
         for split in self.splits:
-            wds_audio_path = self.wds_audio_paths_dict[split]
             df_split = df[df.split == split].drop(columns="split")
             write_audio_tar(
-                df_split.filename.tolist(),
-                df_split.target.tolist(),
-                wds_audio_path.as_posix(),
+                audio_paths=df_split.filename.tolist(),
+                labels=df_split.target.tolist(),
+                tar_path=self.wds_audio_paths_dict[split].as_posix(),
                 force=self.force_generate_audio_tar,
             )
 

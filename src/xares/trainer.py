@@ -48,7 +48,7 @@ class Trainer:
 
     @classmethod
     def decode_wds_batch(cls, batch: Tuple):
-        x, _, y, _ = batch
+        x, y, _ = batch
         x = x.mean(1)
         y = torch.tensor([y_i["target"] for y_i in y])
         return x.to(cls.accelerator.device), y.to(cls.accelerator.device)

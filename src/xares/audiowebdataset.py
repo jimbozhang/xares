@@ -283,7 +283,9 @@ class EmbeddingWebdataset(wds.DataPipeline):
             pipeline.extend([wds.split_by_node, wds.split_by_worker, wds.tarfile_to_samples()])
         pipeline.extend([wds.decode(), wds.to_tuple("pth", "json", "__key__")])
         if batch_size is not None:
-            pipeline.append(wds.batched(batch_size))
+            pipeline.append(
+                wds.batched(batch_size, collation_fn=partial(collate_with_lengths_wds, flatten=False, transpose=True))
+            )
         super().__init__(pipeline)
 
 
@@ -335,7 +337,9 @@ def pad(tensorlist: Sequence[torch.Tensor], padding_value: float = 0.0):
     return out_tensor, torch.as_tensor(lengths)
 
 
-def collate_with_lengths_wds(samples, combine_scalars=True, flatten: bool = True, combine_tensors=True):
+def collate_with_lengths_wds(
+    samples, combine_scalars=True, flatten: bool = True, combine_tensors=True, transpose=False
+):
     batched = list(zip(*samples))
     result = []
     for b in batched:
@@ -345,7 +349,11 @@ def collate_with_lengths_wds(samples, combine_scalars=True, flatten: bool = True
         elif isinstance(b[0], torch.Tensor):
             if combine_tensors:
                 # Added lengths
+                if transpose:
+                    b = (torch.transpose(x, -1, -2) for x in b)
                 b = pad(list(b))
+                if transpose:
+                    b = torch.transpose(b[0], -1, -2)
         elif isinstance(b[0], np.ndarray):
             if combine_tensors:
                 b = np.array(list(b))
@@ -444,12 +452,14 @@ def create_embedding_webdataset(
         dataloader = dataloader.shuffle(512)
     dataloader = dataloader.batched(
         batch_size,
-        collation_fn=collate_with_lengths_wds,
+        collation_fn=partial(collate_with_lengths_wds, flatten=False, transpose=True),
     )
     return dataloader
 
 
-def write_audio_tar(audio_paths: List[str], labels: List, tar_path: str, num_shards: int = 20, force=False):
+def write_audio_tar(
+    audio_paths: List[str], labels: List, tar_path: str, suffix: str = "wav", num_shards: int = 20, force: bool = False
+):
     assert len(audio_paths) == len(labels), "Number of audio files and labels must match."
 
     assert len(audio_paths) >= num_shards, "Number of shards must be less than number of audio files."
@@ -485,7 +495,7 @@ def write_audio_tar(audio_paths: List[str], labels: List, tar_path: str, num_sha
         with wds.TarWriter(sharded_tar_path) as ostream:
             for audio_path, label in zip(shard_audio_paths, shard_labels):
                 sample = make_sample(audio_path, label)
-                if len(sample["wav"]) < 100:
+                if len(sample[suffix]) < 100:
                     logger.warning(f"Skipping {audio_path} due to short length.")
                     continue
                 ostream.write(sample)

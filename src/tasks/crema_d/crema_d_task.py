@@ -1,14 +1,10 @@
-import json
 import subprocess
 from dataclasses import dataclass
-from typing import List
 
 import pandas as pd
 from loguru import logger
-from tqdm import tqdm
-from webdataset import TarWriter, WebLoader
 
-from xares.audiowebdataset import Audiowebdataset_Fluid, proxy_read
+from xares.audiowebdataset import write_audio_tar
 from xares.models import Mlp
 from xares.task_base import TaskBase
 from xares.utils import mkdir_if_not_exists
@@ -16,19 +12,18 @@ from xares.utils import mkdir_if_not_exists
 
 @dataclass
 class CREMADTask(TaskBase):
-    splits = ["test", "valid", "train"]
-    save_encoded_per_batches = 1000
-    batch_size = 32
     trim_length = 96_000
     output_dim = 6
-    metric = "accuracy"
+    batch_size_train = 16
+    learning_rate = 1e-3
+    epochs = 20
 
     def __post_init__(self):
         self.ori_data_root = self.env_dir / "CREMA-D"
         self.model = Mlp(in_features=self.encoder.output_dim, out_features=self.output_dim)
         self.checkpoint_dir = self.env_dir / "checkpoints"
-        self.wds_audio_paths_dict = {split: self.env_dir / f"wds_audio_{split}.tar" for split in self.splits}
-        self.wds_encoded_paths_dict = {split: self.env_dir / f"wds_encoded_{split}.tar" for split in self.splits}
+        self.wds_audio_paths_dict = {split: self.env_dir / f"wds_audio_{split}-*.tar" for split in self.splits}
+        self.wds_encoded_paths_dict = {split: self.env_dir / f"wds_encoded_{split}-*.tar" for split in self.splits}
 
     def make_audio_tar(self):
         if not self.force_generate_audio_tar and self.audio_tar_ready_file.exists():
@@ -51,8 +46,8 @@ class CREMADTask(TaskBase):
             except subprocess.CalledProcessError as e:
                 logger.error(
                     f"Error cloning repository: {e}. "
-                    f"Please use the command 'git lfs clone https://github.com/CheyneyComputerScience/CREMA-D.git' "
-                    f"to download the files to {self.ori_data_root}"
+                    f"You may want to 'git lfs clone https://github.com/CheyneyComputerScience/CREMA-D.git' "
+                    f"to clone the dataset to {self.ori_data_root} manually."
                 )
         else:
             logger.info(f"Directory {self.ori_data_root} already exists. Skip.")
@@ -74,71 +69,13 @@ class CREMADTask(TaskBase):
             "train": df.iloc[2 * test_size :],
         }
         for split in self.splits:
-            split_df = split_df_dic[split]
-            audio_path = self.wds_audio_paths_dict[split]
-            if not self.force_generate_audio_tar and audio_path.exists():
-                logger.info(f"Tar file {audio_path} already exists.")
-            else:
-                with TarWriter(audio_path.as_posix()) as ostream:
-                    for _, row in tqdm(split_df.iterrows(), total=len(split_df)):
-                        sample = proxy_read(row.to_dict(), "clipName")
-                        ostream.write(sample)
+            df_split = split_df_dic[split]
+            write_audio_tar(
+                audio_paths=df_split.clipName.tolist(),
+                labels=df_split.dispEmo.tolist(),
+                tar_path=self.wds_audio_paths_dict[split].as_posix(),
+                force=self.force_generate_audio_tar,
+                num_shards=self.num_shards_rawaudio,
+            )
 
         self.audio_tar_ready_file.touch()
-
-    def make_encoded_tar(self):
-        def write_encoded_batches_to_wds(encoded_batches: List, ostream: TarWriter, identifier: str = None):
-            if identifier is not None:
-                logger.info(f"Writing encoded batches for {identifier} ...")
-
-            for batch, label, keys in encoded_batches:
-                for example, label, key in zip(batch, label["dispEmo"], keys):
-                    sample = {
-                        "pth": example,
-                        "json": json.dumps({"target": label.item()}).encode("utf-8"),
-                        "__key__": key,
-                    }
-                    ostream.write(sample)
-
-        for split in self.splits:
-            audio_path = self.wds_audio_paths_dict[split]
-            encoded_path = self.wds_encoded_paths_dict[split]
-            if not self.force_generate_encoded_tar and encoded_path.exists():
-                logger.info(f"Tar file {encoded_path} already exists.")
-                continue
-
-            ds = Audiowebdataset_Fluid(
-                [audio_path.as_posix()],
-                crop_size=self.trim_length,
-                with_json=True,
-            )
-            dl = WebLoader(ds, batch_size=self.batch_size, num_workers=self.num_encoder_workers)
-
-            logger.info(f"Encoding audio for {split} datafile ...")
-            batch_buf = []
-            with TarWriter(encoded_path.as_posix()) as ostream:
-                for batch, label, keys in tqdm(dl):
-                    encoded_batch = self.encoder(batch, 16_000)
-                    batch_buf.append([encoded_batch, label, keys])
-
-                    if len(batch_buf) >= self.save_encoded_per_batches:
-                        write_encoded_batches_to_wds(batch_buf, ostream, identifier=split)
-                        batch_buf.clear()
-                if len(batch_buf) > 0:
-                    write_encoded_batches_to_wds(batch_buf, ostream, identifier=split)
-
-    def run_all(self) -> float:
-        self.make_audio_tar()
-        self.make_encoded_tar()
-
-        self.ckpt_name = "best_model.pt"
-        self.ckpt_path = self.checkpoint_dir / self.ckpt_name
-
-        self.train_mlp(
-            [self.wds_encoded_paths_dict["train"].as_posix()],
-            [self.wds_encoded_paths_dict["valid"].as_posix()],
-        )
-        acc = self.evaluate_mlp([self.wds_encoded_paths_dict["test"].as_posix()], metric=self.metric, load_ckpt=True)
-        logger.info(f"Accuracy: {acc}")
-
-        return acc

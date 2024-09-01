@@ -2,7 +2,6 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import ignite.metrics
 import torch
@@ -23,22 +22,25 @@ class TaskBase(ABC):
     force_download: bool = False
     force_generate_audio_tar: bool = False
     wds_audio_paths_dict = {}
+    num_shards_rawaudio = 4
 
     # Encoded tar
     force_generate_encoded_tar: bool = False
     encoder: AudioEncoderBase = None
     wds_encoded_paths_dict = {}
-    trim_length: Optional[int] = None
+    trim_length = None
     save_encoded_per_batches = 4
-    batch_size_encode: int = 16
-    num_encoder_workers: int = 0
+    batch_size_encode = 16
+    num_encoder_workers = 0
 
     # MLP
     force_retrain_mlp: bool = False
     ckpt_name = "best.ckpt"
-    batch_size_train: int = 32
-    num_training_workers: int = 8
-    num_validation_workers: int = 4
+    batch_size_train = 32
+    learning_rate = 3e-3
+    epochs = 10
+    num_training_workers = 8
+    num_validation_workers = 4
     model: ModelBase = None
     metric = "accuracy"
 
@@ -119,13 +121,28 @@ class TaskBase(ABC):
             return
 
         assert self.model is not None
-        trainer = Trainer(self.model, checkpoint_dir=self.checkpoint_dir, ckpt_name=self.ckpt_name, metric=self.metric)
+        trainer = Trainer(
+            self.model,
+            checkpoint_dir=self.checkpoint_dir,
+            ckpt_name=self.ckpt_name,
+            metric=self.metric,
+            lr=self.learning_rate,
+            max_epochs=self.epochs,
+        )
 
         dl_train = create_embedding_webdataset(
-            train_url, tar_shuffle=2000, batch_size=self.batch_size_train, num_workers=self.num_training_workers
+            train_url,
+            tar_shuffle=2000,
+            batch_size=self.batch_size_train,
+            num_workers=self.num_training_workers,
+            training=True,
         )
         dl_val = create_embedding_webdataset(
-            validation_url, tar_shuffle=2000, batch_size=self.batch_size_train, num_workers=self.num_validation_workers
+            validation_url,
+            tar_shuffle=2000,
+            batch_size=self.batch_size_train,
+            num_workers=self.num_validation_workers,
+            training=False,
         )
 
         trainer.run(dl_train, dl_val)
