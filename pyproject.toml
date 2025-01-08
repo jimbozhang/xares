@@ -7,18 +7,19 @@ name = "xares"
 version = "0.0.2"
 description = "eXtensive Audio Representation and Evaluation Suite"
 dependencies = [
-  "accelerate",
+  "accelerate==1.2.1",
   "fire",
   "loguru",
-  "scikit-learn",
-  "torch>=2.1.1",
-  "torchaudio>=2.1.1",
+  "numpy<2",
+  "scikit-learn==1.6.0",
+  "torch==2.2.1",
+  "torchaudio==2.2.1",
   "torchmetrics",
   "pandas",
-  "pytorch-ignite",
+  "pytorch-ignite==0.5.1",
   "pyyaml",
   "tqdm",
-  "webdataset>=0.2.86",
+  "webdataset>=0.2.100",
   "pysoundfile",
 ]
 authors = [
@@ -36,7 +37,7 @@ Repository = "https://github.com/jimbozhang/xares.git"
 [project.optional-dependencies]
 examples = [
   "dasheng",
-  "transformers",
+  "transformers==4.47.1",
 ]
 
 [tool.setuptools.packages.find]
