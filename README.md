@@ -73,11 +73,11 @@ The ESC-50 task is used as an example.
 
 ```python
 from example.dasheng.dasheng_encoder import DashengEncoder
-from tasks.esc50 import esc50_task
+from tasks.esc50.task import ESC50Task
 
-task = esc50_task.ESC50Task(encoder=DashengEncoder())
+task = ESC50Task(encoder=DashengEncoder())
 
-task.run()
+score = task.run()
 ```
 
 ## Run with your own pretrained audio encoder
