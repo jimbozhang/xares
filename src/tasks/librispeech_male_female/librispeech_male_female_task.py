@@ -18,10 +18,10 @@ class LibriSpeechMaleFemaleTask(TaskBase):
 
     def __post_init__(self):
         self.ori_data_root = self.env_dir / "LibriSpeech"
-        self.wds_audio_paths_dict = {split: self.env_dir / f"wds-audio-{split}-*.tar" for split in self.splits}
-        self.wds_encoded_paths_dict = {split: self.env_dir / f"wds-encoded-{split}-*.tar" for split in self.splits}
+        self.audio_tar_name_of_split = {split: self.env_dir / f"wds-audio-{split}-*.tar" for split in self.splits}
+        self.encoded_tar_path_of_split = {split: self.env_dir / f"wds-encoded-{split}-*.tar" for split in self.splits}
         self.model = Mlp(in_features=self.encoder.output_dim, out_features=self.output_dim).to(self.encoder.device)
-        self.checkpoint_dir = self.env_dir / "checkpoints"
+        self.ckpt_dir = self.env_dir / "checkpoints"
 
     def make_audio_tar(self):
         if not self.force_generate_audio_tar and self.audio_tar_ready_file.exists():
@@ -69,27 +69,27 @@ class LibriSpeechMaleFemaleTask(TaskBase):
             write_audio_tar(
                 audio_paths=file_paths,
                 labels=targets,
-                tar_path=self.wds_audio_paths_dict[split].as_posix(),
+                tar_path=self.audio_tar_name_of_split[split].as_posix(),
                 suffix="flac",
                 force=self.force_generate_audio_tar,
             )
 
         self.audio_tar_ready_file.touch()
 
-    def run_all(self) -> float:
+    def run(self) -> float:
         self.make_audio_tar()
         self.make_encoded_tar()
         self.train_mlp(
-            [self.wds_encoded_paths_dict["train-clean-100"].as_posix()],
-            [self.wds_encoded_paths_dict["dev-clean"].as_posix()],
+            [self.encoded_tar_path_of_split["train-clean-100"].as_posix()],
+            [self.encoded_tar_path_of_split["dev-clean"].as_posix()],
         )
         acc_clean = self.evaluate_mlp(
-            [self.wds_encoded_paths_dict["test-clean"].as_posix()], metric=self.metric, load_ckpt=True
+            [self.encoded_tar_path_of_split["test-clean"].as_posix()], metric=self.metric, load_ckpt=True
         )
         logger.info(f"The test_clean accuracy is: {acc_clean}")
 
         acc_other = self.evaluate_mlp(
-            [self.wds_encoded_paths_dict["test-other"].as_posix()], metric=self.metric, load_ckpt=True
+            [self.encoded_tar_path_of_split["test-other"].as_posix()], metric=self.metric, load_ckpt=True
         )
         logger.info(f"The test_other accuracy is: {acc_other}")
 

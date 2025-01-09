@@ -75,63 +75,22 @@ The ESC-50 task is used as an example.
 from example.dasheng.dasheng_encoder import DashengEncoder
 from tasks.esc50 import esc50_task
 
-task = esc50_task.ESC50Task(env_root="./env", encoder=DashengEncoder())
+task = esc50_task.ESC50Task(encoder=DashengEncoder())
 
-task.run_all()
+task.run()
 ```
 
 ## Run with your own pretrained audio encoder
 
-An example of audio encoder wrapper could be found at `example/dasheng/dasheng_encoder.py`. It is very simple because the "dasheng" model is already in the required in/out format.
+An example of audio encoder wrapper could be found at `example/dasheng/dasheng_encoder.py` and `example/wav2vec2/wav2vec2.py`.
+
+We provide a check function to verify if the encoder is correctly implemented:
 
 ```python
-from dataclasses import dataclass
-from dasheng import dasheng_base
-from xares.audio_encoder_base import AudioEncoderBase
-
-
-@dataclass
-class DashengEncoder(AudioEncoderBase):
-    model = dasheng_base()
-    sampling_rate = 16_000
-    output_dim = 768
-
-    def __call__(self, audio, sampling_rate):
-        # Since the "dasheng" model is already in the required in/out format, we directly use the super class method
-        return super().__call__(audio, sampling_rate)
-```
-
-Another example could be found at `example/wav2vec2/wav2vec2.py`. It is more complex, you need to covert the input audio and the encoded embedding to the required format.
-
-```python
-from dataclasses import dataclass
-from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2Model
-from xares.audio_encoder_base import AudioEncoderBase
-
-
-@dataclass
-class Wav2vec2Encoder(AudioEncoderBase):
-    output_dim = 768
-
-    def __post_init__(self):
-        self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/wav2vec2-base-960h")
-        self.model = Wav2Vec2Model.from_pretrained("facebook/wav2vec2-base-960h")
-
-    def __call__(self, audio, sampling_rate):
-        input_values = (
-            self.feature_extractor(
-                self.pre_process_audio(audio, sampling_rate), sampling_rate=self.sampling_rate, return_tensors="pt"
-            )
-            .input_values.squeeze()
-            .to(self.device)
-        )
-
-        encoded_audio = self.encode_audio(input_values)["last_hidden_state"]
-
-        if not self.check_encoded_audio(encoded_audio):
-            raise ValueError("Invalid encoded audio")
-
-        return self.encoded_audio
+>>> from xares.audio_encoder_checker import check_audio_encoder
+>>> encoder = DashengEncoder()
+>>> check_audio_encoder(encoder)
+True
 ```
 
 ## Add your own task
