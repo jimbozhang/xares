@@ -95,4 +95,4 @@ True
 
 ## Add your own task
 
-To add a new task, refer to existing task implementations for guidance. Essentially, create a task class that inherits from `TaskBase` and implements the `make_audio_tar` method tailored to your chosen dataset, handling data download, preprocessing, and packaging into the required format.
+To add a new task, refer to existing task implementations for guidance. Essentially, create a task class that inherits from `TaskBase` and implements the `make_encoded_tar()` and the `run()` tailored to your chosen dataset.
