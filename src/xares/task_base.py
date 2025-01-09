@@ -139,7 +139,6 @@ class TaskBase(ABC):
         )
         dl_val = create_embedding_webdataset(
             validation_url,
-            tar_shuffle=2000,
             batch_size=self.batch_size_train,
             num_workers=self.num_validation_workers,
             training=False,

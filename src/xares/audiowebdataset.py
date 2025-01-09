@@ -1,59 +1,23 @@
-# Copied from `xiaomitts/common/audiowebdataset.py`
+# Reduced from `xiaomitts/common/audiowebdataset.py`
 
 import json
 import multiprocessing
 import random
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union  # type: ignore
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union  # type: ignore
 
 import numpy as np
 import torch
 import torchaudio
 import webdataset as wds
+import warnings
 from loguru import logger
 
 
-def db_to_linear(scalar: float) -> float:
-    return 10 ** (scalar / 20)
-
-
-def crop_or_pad_latent_with_audio(
-    latent: torch.Tensor,
-    wav: torch.Tensor,
-    crop_size: int,
-    conditional_crop_size: Optional[int] = None,
-    pad_last: bool = False,
-):
-    dim, n_latents = latent.shape
-    available_crops = n_latents // crop_size
-    # Round to nearest power of 2
-    crop_size_for_wav = (2 ** int(np.round(np.log(wav.shape[0] / n_latents) / np.log(2)))) * crop_size
-    for i in range(available_crops):
-        latent_crop = latent[..., i * crop_size : (i + 1) * crop_size]
-        wav_crop = wav[i * crop_size_for_wav : (i + 1) * crop_size_for_wav, ...]
-        if conditional_crop_size is not None:
-            cond = torch.cat([wav[: i * crop_size_for_wav, ...], wav[(i + 1) * crop_size_for_wav :, ...]])
-            cond, *_ = _crop_audio_for_condition(cond, conditional_crop_size)
-            yield latent_crop, wav_crop, cond
-        else:
-            yield latent_crop, wav_crop
-
-    if (available_crops == 0) or (pad_last):
-        last_crop_latent = latent[..., available_crops * crop_size :]
-        padded_latent = torch.zeros((dim, crop_size))
-        padded_latent[..., : last_crop_latent.shape[-1]] = last_crop_latent
-
-        last_crop_wav = wav[available_crops * crop_size_for_wav :, ...]
-        padded_wav = torch.zeros((crop_size_for_wav, *last_crop_wav.shape[1:]))
-        padded_wav[: last_crop_wav.shape[0]] = last_crop_wav
-        if conditional_crop_size is not None:
-            cond = padded_wav[: available_crops * crop_size_for_wav, ...]
-            cond = _crop_audio_for_condition(cond, conditional_crop_size)
-            yield padded_latent, padded_wav, cond
-        else:
-            yield padded_latent, padded_wav
-
+def fast_warn_and_continue(exn):
+    warnings.warn(repr(exn))
+    return True
 
 def crop_or_pad_audio(wav: torch.Tensor, crop_size: int, pad_last: bool = False):
     n_samples, *_ = wav.shape
@@ -69,29 +33,11 @@ def crop_or_pad_audio(wav: torch.Tensor, crop_size: int, pad_last: bool = False)
         yield padded
 
 
-def _crop_audio_for_condition(audio: torch.Tensor, crop_size: int):
-    audio_length = audio.shape[-1]
-    # Audio too short, pad zeros and return length
-    if audio_length < crop_size:
-        conditional_audio = torch.nn.functional.pad(audio, (0, crop_size - audio_length))
-        start = 0
-        end = audio_length
-    # Randomly crop from the entire clip
-    else:
-        start = np.random.randint(0, audio.shape[-1] - crop_size + 1)
-        end = start + crop_size
-        conditional_audio = audio[start:end]
-    return conditional_audio, start, end
-
-
 def _seq_crop_audio(
     data,
     crop_size: Optional[int],
     mono: bool = True,
     drop_clipped: bool = True,
-    drop_below_db: Optional[float] = None,
-    conditional_crop_size: Optional[Union[float, Tuple[float, float]]] = None,
-    random_gain: Optional[Tuple[int, int]] = None,
     remain_random_one_crop: bool = False,
     handler=None,
 ):
@@ -110,67 +56,9 @@ def _seq_crop_audio(
                 crops = [crops[random.randint(0, len(crops) - 1)]]
         else:
             crops = [audio.float()]
-        if conditional_crop_size is not None:
-            if isinstance(conditional_crop_size, float):
-                conditional_audio, start, end = _crop_audio_for_condition(
-                    audio, crop_size=int(conditional_crop_size * sr)
-                )
-            else:
-                conditional_crop_size_sampled = np.random.uniform(*conditional_crop_size)
-                conditional_audio, start, end = _crop_audio_for_condition(
-                    audio, crop_size=int(conditional_crop_size_sampled * sr)
-                )
-            extra = (conditional_audio, torch.as_tensor([start, end]), *extra)
 
         for crop in crops:
-            if drop_below_db is not None:
-                energy = torch.sum(crop**2)
-                energy_db = 10 * torch.log10(energy)
-                if energy_db < drop_below_db:
-                    continue
-            if random_gain is not None:
-                factor = db_to_linear(np.random.uniform(*random_gain))
-                crop *= factor
             yield (crop, *extra)
-
-
-def _seq_crop_latent(
-    data,
-    crop_size: int,
-    conditional_crop_size: Optional[float] = None,
-    random_gain: Optional[Tuple[int, int]] = None,
-    drop_clipped: bool = False,
-    drop_below_db: Optional[float] = None,
-    handler=None,
-):
-    """WebDataset crop filter, yields random crops"""
-    for sample in data:
-        audio, latent, *extra = sample
-        audio, sample_rate = audio
-        if audio.ndim == 2:
-            audio = audio.mean(0)
-        if audio.abs().max() >= 0.99 and drop_clipped:
-            continue
-        if random_gain is not None:
-            factor = db_to_linear(np.random.uniform(*random_gain))
-            audio *= factor
-        crops = crop_or_pad_latent_with_audio(
-            latent.float(),
-            audio.float(),
-            crop_size=crop_size,
-            conditional_crop_size=(
-                int(sample_rate * conditional_crop_size) if conditional_crop_size is not None else None
-            ),
-            pad_last=False,
-        )
-
-        for crop in crops:
-            if drop_below_db is not None:
-                energy = torch.sum(crop[1] ** 2)
-                energy_db = 10 * torch.log10(energy)
-                if energy_db < drop_below_db:
-                    continue
-            yield (*crop, *extra)
 
 
 class Audiowebdataset(wds.DataPipeline):
@@ -188,7 +76,7 @@ class Audiowebdataset(wds.DataPipeline):
         merge_function: Optional[
             Callable
         ] = None,  # merge function is called before batching. In the merge function we can operate on the data in form of a tuple
-        handler=wds.warn_and_continue,
+        handler=fast_warn_and_continue,
     ):
         pipeline: List = [wds.ResampledShards(urls) if resample else wds.SimpleShardList(urls)]
 
@@ -251,44 +139,6 @@ class Audiowebdataset(wds.DataPipeline):
         super().__init__(pipeline)
 
 
-class EmbeddingWebdataset(wds.DataPipeline):
-    def __init__(
-        self,
-        urls,
-        tar_shuffle: Optional[int] = None,
-        resample: bool = False,
-        batch_size: Optional[int] = None,
-    ):
-        assert isinstance(urls, list)
-        pipeline: List = [wds.SimpleShardList(urls) if resample is False else wds.ResampledShards(urls)]
-        if tar_shuffle is not None:
-            # Tar wise shuffle
-            pipeline.extend(
-                [
-                    wds.detshuffle(
-                        bufsize=tar_shuffle,
-                        initial=tar_shuffle // 4,
-                    ),
-                    wds.split_by_node,
-                    wds.split_by_worker,
-                    # at this point, we have an iterator over the shards assigned to each worker at each node
-                    wds.tarfile_to_samples(handler=wds.warn_and_continue),
-                    wds.shuffle(
-                        bufsize=tar_shuffle,
-                        initial=tar_shuffle // 4,
-                    ),
-                ]
-            )
-        else:
-            pipeline.extend([wds.split_by_node, wds.split_by_worker, wds.tarfile_to_samples()])
-        pipeline.extend([wds.decode(), wds.to_tuple("pth", "json", "__key__")])
-        if batch_size is not None:
-            pipeline.append(
-                wds.batched(batch_size, collation_fn=partial(collate_with_lengths_wds, flatten=False, transpose=True))
-            )
-        super().__init__(pipeline)
-
-
 # Can also replace with wds.Randomix
 class BalancedDatasetSampler(wds.DataPipeline, wds.compat.FluidInterface):
 
@@ -300,18 +150,14 @@ class BalancedDatasetSampler(wds.DataPipeline, wds.compat.FluidInterface):
     def __iter__(self):
         sources = {k: iter(ds) for k, ds in self.datasets.items()}
         while True:
-            ret = {}
-            try:
-                for k, source in sources.items():
-                    ret[k] = next(source)
-                yield ret
-            except StopIteration:
-                return
-
+            for k, source in sources.items():
+                try:
+                    yield next(source)
+                except StopIteration:
+                    break
 
 def expand_with_brace(lists: List[str]):
     import braceexpand
-
     r = []
     for l in lists:
         if "*" in l:
@@ -338,7 +184,7 @@ def pad(tensorlist: Sequence[torch.Tensor], padding_value: float = 0.0):
 
 
 def collate_with_lengths_wds(
-    samples, combine_scalars=True, flatten: bool = True, combine_tensors=True, transpose=False
+        samples: List[Iterable], combine_scalars:bool=True, flatten: bool = True, combine_tensors:bool=True
 ):
     batched = list(zip(*samples))
     result = []
@@ -348,12 +194,7 @@ def collate_with_lengths_wds(
                 b = np.array(list(b))
         elif isinstance(b[0], torch.Tensor):
             if combine_tensors:
-                # Added lengths
-                if transpose:
-                    b = (torch.transpose(x, -1, -2) for x in b)
                 b = pad(list(b))
-                if transpose:
-                    b = torch.transpose(b[0], -1, -2)
         elif isinstance(b[0], np.ndarray):
             if combine_tensors:
                 b = np.array(list(b))
@@ -376,10 +217,9 @@ def create_rawaudio_webdataset(
     target_sample_rate: Optional[int] = None,
     crop_size: Optional[int] = None,
     with_json: bool = False,
-    balanced_samper: Optional[bool] = False,
+    balanced_sampler: Optional[bool] = False,
     num_workers: int = 4,
     training: bool = False,
-    random_gain: Optional[Tuple[int, int]] = None,  # Adds random gain
     remain_random_one_crop: bool = False,
     **kwargs,
 ):
@@ -396,13 +236,12 @@ def create_rawaudio_webdataset(
         merge_function=partial(
             _seq_crop_audio,
             drop_clipped=drop_clipped,
-            random_gain=random_gain,
             mono=True,
             crop_size=crop_size,
             remain_random_one_crop=remain_random_one_crop,
         ),
     )
-    if balanced_samper:
+    if balanced_sampler:
         assert isinstance(urls, dict)
         ds = {k: Audiowebdataset(expand_with_brace(train_data), **dataset_kwargs) for k, train_data in urls.items()}
         dataset = BalancedDatasetSampler(**ds)
@@ -427,7 +266,7 @@ def create_embedding_webdataset(
     urls: Union[List[str], Dict[str, List[str]]],
     tar_shuffle: Optional[int] = None,
     batch_size: int = 16,
-    balanced_samper: Optional[bool] = False,
+    balanced_sampler: Optional[bool] = False,
     num_workers: int = 4,
     training: bool = False,
     **kwargs,
@@ -435,24 +274,31 @@ def create_embedding_webdataset(
     dataset_kwargs = dict(
         tar_shuffle=tar_shuffle,
         batch_size=batch_size,
+        rename_keys=(
+            dict(embedding="pth", json="json", filename="__key__")
+        ),
+        map_kwargs = dict(embedding=lambda x: x.transpose(-2,-1)) #Transpose (B,T,D) -> (B,D,T)
     )
-    if balanced_samper:
+    if balanced_sampler:
         assert isinstance(urls, dict)
-        ds = {k: EmbeddingWebdataset(expand_with_brace(train_data), **dataset_kwargs) for k, train_data in urls.items()}
+        ds = {k: Audiowebdataset(expand_with_brace(train_data), **dataset_kwargs) for k, train_data in urls.items()}
         dataset = BalancedDatasetSampler(**ds)
     else:
         assert isinstance(urls, list)
-        dataset = EmbeddingWebdataset(expand_with_brace(urls), **dataset_kwargs)
+        dataset = Audiowebdataset(expand_with_brace(urls), **dataset_kwargs)
+
     dataloader = wds.WebLoader(
         dataset,
         batch_size=None,
         num_workers=num_workers,
+        persistent_workers=num_workers > 1,
+        pin_memory=True,
     ).unbatched()
     if training:
         dataloader = dataloader.shuffle(512)
     dataloader = dataloader.batched(
         batch_size,
-        collation_fn=partial(collate_with_lengths_wds, flatten=False, transpose=True),
+        collation_fn=partial(collate_with_lengths_wds, flatten=False),
     )
     return dataloader
 
