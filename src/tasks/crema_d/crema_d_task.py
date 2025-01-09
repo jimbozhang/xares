@@ -21,9 +21,9 @@ class CREMADTask(TaskBase):
     def __post_init__(self):
         self.ori_data_root = self.env_dir / "CREMA-D"
         self.model = Mlp(in_features=self.encoder.output_dim, out_features=self.output_dim)
-        self.checkpoint_dir = self.env_dir / "checkpoints"
-        self.wds_audio_paths_dict = {split: self.env_dir / f"wds_audio_{split}-*.tar" for split in self.splits}
-        self.wds_encoded_paths_dict = {split: self.env_dir / f"wds_encoded_{split}-*.tar" for split in self.splits}
+        self.ckpt_dir = self.env_dir / "checkpoints"
+        self.audio_tar_name_of_split = {split: self.env_dir / f"wds_audio_{split}-*.tar" for split in self.splits}
+        self.encoded_tar_path_of_split = {split: self.env_dir / f"wds_encoded_{split}-*.tar" for split in self.splits}
 
     def make_audio_tar(self):
         if not self.force_generate_audio_tar and self.audio_tar_ready_file.exists():
@@ -73,7 +73,7 @@ class CREMADTask(TaskBase):
             write_audio_tar(
                 audio_paths=df_split.clipName.tolist(),
                 labels=df_split.dispEmo.tolist(),
-                tar_path=self.wds_audio_paths_dict[split].as_posix(),
+                tar_path=self.audio_tar_name_of_split[split].as_posix(),
                 force=self.force_generate_audio_tar,
                 num_shards=self.num_shards_rawaudio,
             )

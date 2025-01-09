@@ -25,7 +25,7 @@ class Trainer:
     optimizer: str = "Adam"
     lr: float = 3e-3
     max_epochs: int = 10
-    checkpoint_dir: str = "checkpoints"
+    ckpt_dir: str = "checkpoints"
     best_ckpt_path: str = None
     ckpt_name: str = "best_model.pt"
     metric: str = "accuracy"
@@ -99,7 +99,7 @@ class Trainer:
         from ignite.handlers import ModelCheckpoint
 
         checkpoint_handler = ModelCheckpoint(
-            dirname=self.checkpoint_dir,
+            dirname=self.ckpt_dir,
             filename_pattern=self.ckpt_name,
             n_saved=1,
             create_dir=True,
