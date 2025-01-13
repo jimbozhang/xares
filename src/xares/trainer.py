@@ -16,7 +16,7 @@ from tqdm import tqdm
 import sys
 # Make the logger with this format the default for all loggers in this package
 logger.configure(handlers=[{
-    "sink": sys.stderr,
+    "sink": sys.stdout,
     "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
     'level': 'DEBUG',
 }])
@@ -100,7 +100,7 @@ class Trainer:
             self.ignite_evaluator.run(dl_dev)
             metrics = self.ignite_evaluator.state.metrics
             logger.info(
-                f"Epoch: {trainer.state.epoch}  {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
+                    f"Epoch: {trainer.state.epoch} {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
             )
             if metrics[self.metric] > self.best_metric:
                 self.best_metric = metrics[self.metric]
