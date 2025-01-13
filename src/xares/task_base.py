@@ -2,32 +2,45 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, List, Optional
 
 import ignite.metrics
+import numpy as np
 import torch
+import torch.nn as nn
 from loguru import logger
 
-from xares.audio_encoder_base import AudioEncoderBase
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset, write_encoded_batches_to_wds
-from xares.models import ModelBase
+from xares.common import XaresSettings
+from xares.models import Mlp
 from xares.trainer import MetricType, Trainer, inference
+from xares.utils import download_zenodo_record
 
 
 @dataclass
-class TaskBase(ABC):
-    env_root: Path | str = "/tmp/xares-env"
-    splits = ["test", "valid", "train"]
+class TaskConfig:
+    xares_settings = XaresSettings()
+    env_root: Path | str = xares_settings.env_root
+
+    # Splits
+    train_split: Optional[str] = "train"
+    valid_split: Optional[str] = "valid"
+    test_split: Optional[str] = "test"
+    k_fold_splits: Optional[List] = None
 
     # Audio tar
     force_download: bool = False
     force_generate_audio_tar: bool = False
-    wds_audio_paths_dict = {}
+    audio_tar_name_of_split = {}
     num_shards_rawaudio = 4
 
+    streaming_wds: bool = xares_settings.streaming_wds_default
+    zenodo_id: Optional[str] = None  # Only used when streaming_wds is True
+
     # Encoded tar
-    force_generate_encoded_tar: bool = False
-    encoder: AudioEncoderBase = None
-    wds_encoded_paths_dict = {}
+    force_encoded: bool = False
+    encoder: Any = None
+    encoded_tar_path_of_split = {}
     trim_length = None
     save_encoded_per_batches = 4
     batch_size_encode = 16
@@ -35,58 +48,120 @@ class TaskBase(ABC):
 
     # MLP
     force_retrain_mlp: bool = False
+    ckpt_dir_name = "checkpoints"
     ckpt_name = "best.ckpt"
     batch_size_train = 32
     learning_rate = 3e-3
     epochs = 10
     num_training_workers = 8
     num_validation_workers = 4
-    model: ModelBase = None
+    model: nn.Module = None
+    output_dim: int = None
     metric = "accuracy"
 
-    @property
-    def env_dir(self) -> Path:
-        return Path(self.env_root) / self.__class__.__name__.replace("Task", "").lower()
 
-    @property
-    def audio_tar_ready_file(self):
-        return self.env_dir / ".audio_tar_ready"
-
-    @property
-    def encoded_tar_ready_file(self):
-        return self.env_dir / ".encoded_tar_ready"
-
-    def run_all(self) -> float:
+class TaskBase(ABC):
+    def __init__(self, encoder: Any, config: Optional[TaskConfig] = None):
         logging.captureWarnings(True)
         logging.getLogger("py.warnings").setLevel(logging.ERROR)
 
-        self.make_audio_tar()
-        self.make_encoded_tar()
-        self.train_mlp(
-            [self.wds_encoded_paths_dict["train"].as_posix()],
-            [self.wds_encoded_paths_dict["valid"].as_posix()],
-        )
-        acc = self.evaluate_mlp([self.wds_encoded_paths_dict["test"].as_posix()], metric=self.metric, load_ckpt=True)
-        logger.info(f"The accuracy: {acc}")
-        return acc
+        self.config = config or TaskConfig()
+        self.encoder = encoder
+        self.mlp = None
+
+        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().strip("task")
+        self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name
+        self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
+
+        if self.config.k_fold_splits:
+            self.config.train_split = self.config.valid_split = self.config.test_split = None
 
     @abstractmethod
-    def make_audio_tar(self, force_download=False, force_generate_tar=False) -> None:
+    def run(self) -> float:
         pass
 
+    @abstractmethod
     def make_encoded_tar(self):
-        if not self.force_generate_encoded_tar and self.encoded_tar_ready_file.exists():
-            logger.info(f"Skip making encoded tar. {self.encoded_tar_ready_file} already exists.")
+        pass
+
+    def default_run(self) -> float:
+        self.make_encoded_tar()
+
+        self.config.train_mlp(
+            [self.config.encoded_tar_path_of_split[self.config.train_split].as_posix()],
+            [self.config.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
+        )
+        acc = self.config.evaluate_mlp(
+            [self.config.encoded_tar_path_of_split[self.config.test_split].as_posix()],
+            metric=self.config.metric,
+            load_ckpt=True,
+        )
+        logger.info(f"The accuracy: {acc}")
+
+        score = acc
+        return score
+
+    def default_run_k_fold(self) -> float:
+        self.make_encoded_tar()
+
+        acc = []
+        splits = self._make_splits()
+        wds_encoded_training_fold_k = {
+            k: [self.config.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
+        }
+
+        for k in splits:
+            self.config.ckpt_name = f"fold_{k}_best_model.pt"
+            self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
+            self.train_mlp(
+                wds_encoded_training_fold_k[k],
+                [self.config.encoded_tar_path_of_split[k].as_posix()],
+            )
+            acc.append(
+                self.evaluate_mlp(
+                    [self.config.encoded_tar_path_of_split[k].as_posix()], metric=self.config.metric, load_ckpt=True
+                )
+            )
+
+        for k in range(len(splits)):
+            logger.info(f"Fold {k+1} accuracy: {acc[k]}")
+
+        avg_score = np.mean(acc)
+        logger.info(f"The averaged accuracy of 5 folds is: {avg_score}")
+
+        return avg_score
+
+    def default_make_encoded_tar(self):
+        encoded_ready_path = self.env_dir / self.config.xares_settings.encoded_ready_filename
+        if not self.config.force_encoded and encoded_ready_path.exists():
+            logger.info(f"Skip making encoded tar.")
             return
 
-        for split in self.splits:
+        if self.config.streaming_wds:
+            self.config.audio_tar_path_of_split = {
+                split: f"https://zenodo.org/records/{self.config.zenodo_id}/files/{self.config.audio_tar_name_of_split[split]}"
+                for split in self.config.audio_tar_name_of_split
+            }
+        else:
+            audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
+            if not audio_ready_path.exists():
+                download_zenodo_record(self.config.zenodo_id, self.env_dir, force=self.config.force_download)
+                audio_ready_path.touch()
+
+            self.config.audio_tar_path_of_split = {
+                split: (self.env_dir / self.config.audio_tar_name_of_split[split]).as_posix()
+                for split in self.config.audio_tar_name_of_split
+            }
+
+        splits = self._make_splits()
+        for split in splits:
             logger.info(f"Encoding audio for split {split} ...")
 
             dl = create_rawaudio_webdataset(
-                [self.wds_audio_paths_dict[split].as_posix()],
-                batch_size=self.batch_size_encode,
-                num_workers=self.num_encoder_workers,
-                crop_size=self.trim_length,
+                [self.config.audio_tar_path_of_split[split]],
+                batch_size=self.config.batch_size_encode,
+                num_workers=self.config.num_encoder_workers,
+                crop_size=self.config.trim_length,
                 with_json=True,
             )
 
@@ -97,11 +172,11 @@ class TaskBase(ABC):
                 encoded_batch = self.encoder(batch, 44_100).to("cpu").detach()
                 batch_buf.append([encoded_batch, label, keys])
 
-                if len(batch_buf) >= self.save_encoded_per_batches:
+                if len(batch_buf) >= self.config.save_encoded_per_batches:
                     write_encoded_batches_to_wds(
                         batch_buf,
-                        self.wds_encoded_paths_dict[split].as_posix().replace("*", f"0{shard:05d}"),
-                        num_workers=self.num_encoder_workers,
+                        self.config.encoded_tar_path_of_split[split].as_posix().replace("*", f"0{shard:05d}"),
+                        num_workers=self.config.num_encoder_workers,
                     )
                     batch_buf.clear()
                     shard += 1
@@ -109,47 +184,51 @@ class TaskBase(ABC):
             if len(batch_buf) > 0:
                 write_encoded_batches_to_wds(
                     batch_buf,
-                    self.wds_encoded_paths_dict[split].as_posix().replace("*", f"0{shard:05d}"),
-                    num_workers=self.num_encoder_workers,
+                    self.config.encoded_tar_path_of_split[split].as_posix().replace("*", f"0{shard:05d}"),
+                    num_workers=self.config.num_encoder_workers,
                 )
-
-        self.encoded_tar_ready_file.touch()
+        encoded_ready_path.touch()
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
-        if not self.force_retrain_mlp and self.ckpt_path.exists():
+        self.mlp = Mlp(in_features=self.encoder.output_dim, out_features=self.config.output_dim).to(self.encoder.device)
+
+        if not self.config.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
+            self.mlp.load_state_dict(torch.load(self.ckpt_path))
             return
 
-        assert self.model is not None
         trainer = Trainer(
-            self.model,
-            checkpoint_dir=self.checkpoint_dir,
-            ckpt_name=self.ckpt_name,
-            metric=self.metric,
-            lr=self.learning_rate,
-            max_epochs=self.epochs,
+            self.mlp,
+            ckpt_dir=self.ckpt_dir,
+            ckpt_name=self.config.ckpt_name,
+            metric=self.config.metric,
+            lr=self.config.learning_rate,
+            max_epochs=self.config.epochs,
         )
 
         dl_train = create_embedding_webdataset(
             train_url,
             tar_shuffle=2000,
-            batch_size=self.batch_size_train,
-            num_workers=self.num_training_workers,
+            batch_size=self.config.batch_size_train,
+            num_workers=self.config.num_training_workers,
             training=True,
         )
         dl_val = create_embedding_webdataset(
             validation_url,
-            batch_size=self.batch_size_train,
-            num_workers=self.num_validation_workers,
+            batch_size=self.config.batch_size_train,
+            num_workers=self.config.num_validation_workers,
             training=False,
         )
 
         trainer.run(dl_train, dl_val)
 
     def evaluate_mlp(self, eval_url: list, metric: str = "Accuracy", load_ckpt: bool = False) -> float:
+        if self.mlp is None:
+            raise ValueError("Train the model first before evaluation.")
+
         if load_ckpt:
             if self.ckpt_path.exists():
-                self.model.load_state_dict(torch.load(self.ckpt_path))
+                self.mlp.load_state_dict(torch.load(self.ckpt_path))
                 logger.info(f"Loaded model parameters from {self.ckpt_path}")
             else:
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
@@ -157,7 +236,7 @@ class TaskBase(ABC):
         dl = create_embedding_webdataset(
             eval_url, tar_shuffle=2000, batch_size=self.batch_size_train, num_workers=self.num_validation_workers
         )
-        preds, labels = inference(self.model, dl)
+        preds, labels = inference(self.mlp, dl)
 
         metric_func = MetricType[metric].__name__
         try:
@@ -170,7 +249,11 @@ class TaskBase(ABC):
         return result
 
     def train_knn(self):
-        pass
+        raise NotImplementedError
 
     def evaluate_knn(self):
-        pass
+        raise NotImplementedError
+
+    def _make_splits(self):
+        splits = self.config.k_fold_splits or [self.config.train_split, self.config.valid_split, self.config.test_split]
+        return list(filter(None, splits))

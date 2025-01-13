@@ -111,7 +111,7 @@ class Trainer:
         from ignite.handlers import ModelCheckpoint
 
         checkpoint_handler = ModelCheckpoint(
-            dirname=self.checkpoint_dir,
+            dirname=self.ckpt_dir,
             filename_pattern=self.ckpt_name,
             n_saved=1,
             create_dir=True,
