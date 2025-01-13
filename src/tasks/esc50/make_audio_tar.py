@@ -53,7 +53,7 @@ def make_audio_tar(env_root: Optional[str] = None, force_download=False, force_g
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Make audio tar files for ESC-50 dataset.")
+    parser = argparse.ArgumentParser(description="Make audio tar files.")
     parser.add_argument("--env_root", type=str, default=None, help="Root directory for the environment.")
     parser.add_argument("--force_download", action="store_true", help="Force download of the dataset.")
     parser.add_argument(
