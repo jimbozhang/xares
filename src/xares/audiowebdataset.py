@@ -188,7 +188,7 @@ def collate_with_lengths_wds(
 ):
     batched = list(zip(*samples))
     result = []
-    for b in batched:
+    for i, b in enumerate(batched):
         if isinstance(b[0], (int, float)):
             if combine_scalars:
                 b = np.array(list(b))
@@ -200,6 +200,9 @@ def collate_with_lengths_wds(
                 b = np.array(list(b))
         else:
             b = list(b)
+            if i == 1 and label_processor is not None:  # i==1 is the label
+                b = [label_processor(x) for x in b]
+
         # Do not flatten lists, i.e., some filenames
         if flatten and not isinstance(b, list):
             result.extend(b)
@@ -269,6 +272,7 @@ def create_embedding_webdataset(
     balanced_sampler: Optional[bool] = False,
     num_workers: int = 4,
     training: bool = False,
+    label_processor: Optional[Callable] = None,
     **kwargs,
 ):
     dataset_kwargs = dict(
@@ -323,7 +327,12 @@ def write_audio_tar(
         }
         # If we have some labels, also dump a .json file
         if label is not None:
-            ret_data["json"] = json.dumps({"label": label}).encode("utf-8")
+            if isinstance(label, dict):
+                ret_data["json"] = json.dumps(label).encode("utf-8")
+            elif isinstance(label, str):
+                ret_data["json"] = json.dumps({"label": label}).encode("utf-8")
+            else:
+                raise ValueError("Label must be either dict or str.")
         return ret_data
 
     for shard in range(num_shards):
@@ -350,7 +359,11 @@ def write_audio_tar(
 def batch_to_sample(example, label, key):
     sample = {
         "pth": example,
-        "json": json.dumps({"target": label["label"]}).encode("utf-8"),
+        "json": (
+            json.dumps(label).encode("utf-8")
+            if isinstance(label, dict)
+            else json.dumps({"target": label["label"]}).encode("utf-8")
+        ),
         "__key__": key,
     }
     return sample

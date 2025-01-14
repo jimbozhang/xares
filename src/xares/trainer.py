@@ -40,6 +40,7 @@ class Trainer:
     best_ckpt_path: str | None = None
     ckpt_name: str = "best_model.pt"
     metric: str = "accuracy"
+    label_name: str = "target"
     best_metric: float = 0.0
     save_model: bool = True
 
@@ -61,11 +62,10 @@ class Trainer:
         ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(self.ignite_evaluator)
 
     @classmethod
-    def decode_wds_batch(cls, batch: Iterable):
-        (x,x_length), y, _ = batch
-        # x= (B, D ,T ), x_length = (B,)
-        x = x.mean(-1) # Pool across time
-        y = torch.tensor([y_i["target"] for y_i in y])
+    def decode_wds_batch(cls, batch: Tuple):
+        x, y, _ = batch
+        x = x.mean(1)
+        y = torch.tensor(y)
         return x.to(cls.accelerator.device), y.to(cls.accelerator.device)
 
     def train_step(self, engine:Engine, batch:Tensor) -> Dict[str,Tensor]:

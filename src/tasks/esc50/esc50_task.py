@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from xares.task_base import TaskBase
 
 
@@ -13,11 +11,10 @@ class ESC50Task(TaskBase):
         self.config.audio_tar_name_of_split = {
             fold: f"wds-audio-fold-{fold}-*.tar" for fold in self.config.k_fold_splits
         }
-        self.config.encoded_tar_path_of_split = {
-            fold: self.env_dir / f"wds-encoded-fold-{fold}-*.tar" for fold in self.config.k_fold_splits
+        self.config.encoded_tar_name_of_split = {
+            fold: f"wds-encoded-fold-{fold}-*.tar" for fold in self.config.k_fold_splits
         }
 
-        self.config.trim_length = 220_500
         self.config.output_dim = 50
 
     def run(self) -> float:

@@ -9,6 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from loguru import logger
+from tqdm import tqdm
 
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset, write_encoded_batches_to_wds
 from xares.common import XaresSettings
@@ -33,16 +34,14 @@ class TaskConfig:
     force_generate_audio_tar: bool = False
     audio_tar_name_of_split = {}
     num_shards_rawaudio = 4
-
-    streaming_wds: bool = xares_settings.streaming_wds_default
-    zenodo_id: Optional[str] = None  # Only used when streaming_wds is True
+    zenodo_id: Optional[str] = None
 
     # Encoded tar
     force_encoded: bool = False
     encoder: Any = None
-    encoded_tar_path_of_split = {}
+    encoded_tar_name_of_split = {}
     trim_length = None
-    save_encoded_per_batches = 4
+    save_encoded_per_batches = 64
     batch_size_encode = 16
     num_encoder_workers = 0
 
@@ -53,11 +52,26 @@ class TaskConfig:
     batch_size_train = 32
     learning_rate = 3e-3
     epochs = 10
-    num_training_workers = 8
+    num_training_workers = 4
     num_validation_workers = 4
     model: nn.Module = None
     output_dim: int = None
     metric = "accuracy"
+
+    def __post_init__(self):
+        self.update_tar_name_of_split()
+
+    def update_tar_name_of_split(self):
+        self.audio_tar_name_of_split = {
+            self.train_split: f"wds-audio-{self.train_split}-*.tar",
+            self.valid_split: f"wds-audio-{self.valid_split}-*.tar",
+            self.test_split: f"wds-audio-{self.test_split}-*.tar",
+        }
+        self.encoded_tar_name_of_split = {
+            self.train_split: f"wds-encoded-{self.train_split}-*.tar",
+            self.valid_split: f"wds-encoded-{self.valid_split}-*.tar",
+            self.test_split: f"wds-encoded-{self.test_split}-*.tar",
+        }
 
 
 class TaskBase(ABC):
@@ -76,6 +90,8 @@ class TaskBase(ABC):
         if self.config.k_fold_splits:
             self.config.train_split = self.config.valid_split = self.config.test_split = None
 
+        self.label_processor = lambda x: x["target"]
+
     @abstractmethod
     def run(self) -> float:
         pass
@@ -87,12 +103,12 @@ class TaskBase(ABC):
     def default_run(self) -> float:
         self.make_encoded_tar()
 
-        self.config.train_mlp(
-            [self.config.encoded_tar_path_of_split[self.config.train_split].as_posix()],
-            [self.config.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
+        self.train_mlp(
+            [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
+            [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
         )
-        acc = self.config.evaluate_mlp(
-            [self.config.encoded_tar_path_of_split[self.config.test_split].as_posix()],
+        acc = self.evaluate_mlp(
+            [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
             metric=self.config.metric,
             load_ckpt=True,
         )
@@ -107,7 +123,7 @@ class TaskBase(ABC):
         acc = []
         splits = self._make_splits()
         wds_encoded_training_fold_k = {
-            k: [self.config.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
+            k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
         }
 
         for k in splits:
@@ -115,11 +131,11 @@ class TaskBase(ABC):
             self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
             self.train_mlp(
                 wds_encoded_training_fold_k[k],
-                [self.config.encoded_tar_path_of_split[k].as_posix()],
+                [self.encoded_tar_path_of_split[k].as_posix()],
             )
             acc.append(
                 self.evaluate_mlp(
-                    [self.config.encoded_tar_path_of_split[k].as_posix()], metric=self.config.metric, load_ckpt=True
+                    [self.encoded_tar_path_of_split[k].as_posix()], metric=self.config.metric, load_ckpt=True
                 )
             )
 
@@ -132,33 +148,31 @@ class TaskBase(ABC):
         return avg_score
 
     def default_make_encoded_tar(self):
+        self.encoded_tar_path_of_split = {
+            split: (self.env_dir / self.config.encoded_tar_name_of_split[split])
+            for split in self.config.encoded_tar_name_of_split
+        }
+
         encoded_ready_path = self.env_dir / self.config.xares_settings.encoded_ready_filename
         if not self.config.force_encoded and encoded_ready_path.exists():
             logger.info(f"Skip making encoded tar.")
             return
 
-        if self.config.streaming_wds:
-            self.config.audio_tar_path_of_split = {
-                split: f"https://zenodo.org/records/{self.config.zenodo_id}/files/{self.config.audio_tar_name_of_split[split]}"
-                for split in self.config.audio_tar_name_of_split
-            }
-        else:
-            audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
-            if not audio_ready_path.exists():
-                download_zenodo_record(self.config.zenodo_id, self.env_dir, force=self.config.force_download)
-                audio_ready_path.touch()
+        audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
+        if not audio_ready_path.exists():
+            download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
+            audio_ready_path.touch()
 
-            self.config.audio_tar_path_of_split = {
-                split: (self.env_dir / self.config.audio_tar_name_of_split[split]).as_posix()
-                for split in self.config.audio_tar_name_of_split
-            }
+        audio_tar_path_of_split = {
+            split: (self.env_dir / self.config.audio_tar_name_of_split[split]).as_posix()
+            for split in self.config.audio_tar_name_of_split
+        }
 
-        splits = self._make_splits()
-        for split in splits:
+        for split in audio_tar_path_of_split:
             logger.info(f"Encoding audio for split {split} ...")
 
             dl = create_rawaudio_webdataset(
-                [self.config.audio_tar_path_of_split[split]],
+                [audio_tar_path_of_split[split]],
                 batch_size=self.config.batch_size_encode,
                 num_workers=self.config.num_encoder_workers,
                 crop_size=self.config.trim_length,
@@ -167,7 +181,7 @@ class TaskBase(ABC):
 
             batch_buf = []
             shard = 0
-            for batch, _, label, keys in dl:
+            for batch, _, label, keys in tqdm(dl, desc=f"Encoding {split}"):
                 batch = batch.to(self.encoder.device)
                 encoded_batch = self.encoder(batch, 44_100).to("cpu").detach()
                 batch_buf.append([encoded_batch, label, keys])
@@ -175,7 +189,7 @@ class TaskBase(ABC):
                 if len(batch_buf) >= self.config.save_encoded_per_batches:
                     write_encoded_batches_to_wds(
                         batch_buf,
-                        self.config.encoded_tar_path_of_split[split].as_posix().replace("*", f"0{shard:05d}"),
+                        self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0{shard:05d}"),
                         num_workers=self.config.num_encoder_workers,
                     )
                     batch_buf.clear()
@@ -184,7 +198,7 @@ class TaskBase(ABC):
             if len(batch_buf) > 0:
                 write_encoded_batches_to_wds(
                     batch_buf,
-                    self.config.encoded_tar_path_of_split[split].as_posix().replace("*", f"0{shard:05d}"),
+                    self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0{shard:05d}"),
                     num_workers=self.config.num_encoder_workers,
                 )
         encoded_ready_path.touch()
@@ -212,12 +226,14 @@ class TaskBase(ABC):
             batch_size=self.config.batch_size_train,
             num_workers=self.config.num_training_workers,
             training=True,
+            label_processor=self.label_processor,
         )
         dl_val = create_embedding_webdataset(
             validation_url,
             batch_size=self.config.batch_size_train,
             num_workers=self.config.num_validation_workers,
             training=False,
+            label_processor=self.label_processor,
         )
 
         trainer.run(dl_train, dl_val)
