@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from typing import Optional
 
-import pandas as pd
 from loguru import logger
 
 from xares.audiowebdataset import write_audio_tar

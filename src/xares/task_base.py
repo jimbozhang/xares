@@ -34,7 +34,7 @@ class TaskConfig:
     force_generate_audio_tar: bool = False
     audio_tar_name_of_split = {}
     num_shards_rawaudio = 4
-    zenodo_id: Optional[str] = None  # Only used when streaming_wds is True
+    zenodo_id: Optional[str] = None
 
     # Encoded tar
     force_encoded: bool = False
@@ -160,7 +160,7 @@ class TaskBase(ABC):
 
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
         if not audio_ready_path.exists():
-            download_zenodo_record(self.config.zenodo_id, self.env_dir, force=self.config.force_download)
+            download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
             audio_ready_path.touch()
 
         audio_tar_path_of_split = {
