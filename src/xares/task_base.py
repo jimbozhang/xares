@@ -22,7 +22,7 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 @dataclass
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
-    env_root: Path | str | None =  None 
+    env_root: Path | str | None =  None
 
     # Splits
     train_split: None | str = "train"
@@ -88,7 +88,7 @@ class TaskBase(ABC):
 
         self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().strip("task")
         mkdir_if_not_exists(self.env_dir)
-        self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name
+        self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / encoder.__class__.__name__
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
 
         if self.config.k_fold_splits:
