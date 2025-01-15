@@ -1,15 +1,26 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Dict, Iterable, Tuple
 
 import torch
+from torch import Tensor
 import torch.nn as nn
 from accelerate import Accelerator
 from ignite.contrib.metrics import AveragePrecision
 from ignite.engine import Engine, Events
-from ignite.metrics import Accuracy, Loss
+from ignite.handlers.tqdm_logger import ProgressBar
+from ignite.metrics import Accuracy, Loss, RunningAverage
 from loguru import logger
 from torch import nn, optim
 from tqdm import tqdm
+import sys
+# Make the logger with this format the default for all loggers in this package
+logger.configure(handlers=[{
+    "sink": sys.stdout,
+    "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
+    'level': 'DEBUG',
+}])
+
 
 MetricType = {
     "accuracy": Accuracy,
@@ -17,16 +28,32 @@ MetricType = {
 }
 
 
+def length_to_mask(length):
+    max_length = length.amax().item()
+    idx = torch.arange(max_length,
+                        device=length.device)
+    return idx.unsqueeze(0) < length.unsqueeze(-1)
+
+
+def masked_mean(x, x_length, dim:int=-1):
+    mask = length_to_mask(x_length)
+    mask_target_shape = (len(mask),) +  (1,) * (x.ndim-2) + (mask.shape[-1],)
+    mask = mask.view(mask_target_shape)
+    return (x * mask).sum(dim) / mask.sum(dim)
+
+
+
+
 @dataclass
 class Trainer:
     model: nn.Module
-    accelerator = Accelerator()
+    accelerator :Accelerator = Accelerator()
     criterion: str = "CrossEntropyLoss"
     optimizer: str = "Adam"
     lr: float = 3e-3
     max_epochs: int = 10
     ckpt_dir: str = "checkpoints"
-    best_ckpt_path: str = None
+    best_ckpt_path: str | None = None
     ckpt_name: str = "best_model.pt"
     metric: str = "accuracy"
     label_name: str = "target"
@@ -46,25 +73,29 @@ class Trainer:
 
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(self.validation_step)
+        ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(self.ignite_trainer, output_transform=lambda x:x)
+        RunningAverage(output_transform=lambda x: x['loss']).attach(self.ignite_trainer, 'loss_avg')
+        ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(self.ignite_evaluator)
 
     @classmethod
     def decode_wds_batch(cls, batch: Tuple):
-        x, y, _ = batch
-        x = x.mean(1)
+        (x,x_length), y, _ = batch
+        x = masked_mean(x, x_length=x_length, dim=-1)
         y = torch.tensor(y)
         return x.to(cls.accelerator.device), y.to(cls.accelerator.device)
 
-    def train_step(self, engine, batch):
+    def train_step(self, engine:Engine, batch:Tensor) -> Dict[str,Tensor]:
         self.model.train()
-        self.optimizer.zero_grad()
-        x, y = self.decode_wds_batch(batch)
-        y_pred = self.model(x)
-        loss = self.criterion(y_pred, y)
-        self.accelerator.backward(loss)
-        self.optimizer.step()
-        return loss.item()
+        with torch.enable_grad(), self.accelerator.accumulate(self.model):
+            self.optimizer.zero_grad()
+            x, y = self.decode_wds_batch(batch)
+            y_pred = self.model(x)
+            loss = self.criterion(y_pred, y)
+            self.accelerator.backward(loss)
+            self.optimizer.step()
+            return {'loss':loss.item(), 'lr':self.optimizer.param_groups[0]['lr']}
 
-    def validation_step(self, engine, batch):
+    def validation_step(self, engine:Engine, batch:Iterable[Tensor]) -> Tuple[Tensor,Tensor]:
         self.model.eval()
         with torch.inference_mode():
             x, y = self.decode_wds_batch(batch)
@@ -80,16 +111,12 @@ class Trainer:
         for name, metric in metrics.items():
             metric.attach(self.ignite_evaluator, name)
 
-        @self.ignite_trainer.on(Events.ITERATION_COMPLETED(every=10))
-        def log_training_loss(trainer):
-            logger.info(f"Epoch[{trainer.state.epoch}] Loss: {trainer.state.output:.5f}")
-
         @self.ignite_trainer.on(Events.EPOCH_COMPLETED)
         def log_validation_results(trainer):
             self.ignite_evaluator.run(dl_dev)
             metrics = self.ignite_evaluator.state.metrics
             logger.info(
-                f"Epoch: {trainer.state.epoch}  {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
+                    f"Epoch: {trainer.state.epoch} {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
             )
             if metrics[self.metric] > self.best_metric:
                 self.best_metric = metrics[self.metric]
@@ -123,8 +150,7 @@ def inference(model, dl_eval):
 
     with torch.inference_mode():
         model.eval()
-        tqdm_dataloader = tqdm(dl_eval, desc="Evaluating")
-        for batch in tqdm_dataloader:
+        for batch in tqdm(dl_eval, desc="Evaluating"):
             x, y = Trainer.decode_wds_batch(batch)
             y_pred = model(x)
             all_preds.append(y_pred)
