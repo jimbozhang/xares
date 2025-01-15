@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import ignite.metrics
 import numpy as np
@@ -22,7 +23,7 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 @dataclass
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
-    env_root: Path | str | None =  None 
+    env_root: Path | str | None = None
 
     # Splits
     train_split: None | str = "train"
@@ -42,19 +43,19 @@ class TaskConfig:
     encoder: Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
-    save_encoded_per_batches:int = 64
-    batch_size_encode:int = 16
-    num_encoder_workers:int = 0
+    save_encoded_per_batches: int = 64
+    batch_size_encode: int = 16
+    num_encoder_workers: int = 0
 
     # MLP
     force_retrain_mlp: bool = False
     ckpt_dir_name = "checkpoints"
     ckpt_name = "best.ckpt"
-    batch_size_train:int = 32
-    learning_rate:float = 3e-3
-    epochs:int = 10
-    num_training_workers:int = 4
-    num_validation_workers:int = 4
+    batch_size_train: int = 32
+    learning_rate: float = 3e-3
+    epochs: int = 10
+    num_training_workers: int = 4
+    num_validation_workers: int = 4
     model: nn.Module | None = None
     output_dim: int | None = None
     metric = "accuracy"
@@ -78,7 +79,7 @@ class TaskConfig:
 
 
 class TaskBase(ABC):
-    def __init__(self, encoder: Any, config: Optional[TaskConfig] = None):
+    def __init__(self, encoder: Any, config: None | TaskConfig = None):
         logging.captureWarnings(True)
         logging.getLogger("py.warnings").setLevel(logging.ERROR)
 
@@ -254,7 +255,10 @@ class TaskBase(ABC):
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
         dl = create_embedding_webdataset(
-            eval_url, batch_size=self.config.batch_size_train, num_workers=self.config.num_validation_workers, label_processor=self.label_processor
+            eval_url,
+            batch_size=self.config.batch_size_train,
+            num_workers=self.config.num_validation_workers,
+            label_processor=self.label_processor,
         )
         preds, labels = inference(self.mlp, dl)
 
