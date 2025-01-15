@@ -1,8 +1,9 @@
+from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import ignite.metrics
 import numpy as np
@@ -15,51 +16,53 @@ from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_w
 from xares.common import XaresSettings
 from xares.models import Mlp
 from xares.trainer import MetricType, Trainer, inference
-from xares.utils import download_zenodo_record
+from xares.utils import download_zenodo_record, mkdir_if_not_exists
 
 
 @dataclass
 class TaskConfig:
-    xares_settings = XaresSettings()
-    env_root: Path | str = xares_settings.env_root
+    xares_settings: XaresSettings = field(default_factory=XaresSettings)
+    env_root: Path | str | None =  None 
 
     # Splits
-    train_split: Optional[str] = "train"
-    valid_split: Optional[str] = "valid"
-    test_split: Optional[str] = "test"
-    k_fold_splits: Optional[List] = None
+    train_split: None | str = "train"
+    valid_split: None | str = "valid"
+    test_split: None | str = "test"
+    k_fold_splits: None | List[int | str] = None
 
     # Audio tar
     force_download: bool = False
     force_generate_audio_tar: bool = False
-    audio_tar_name_of_split = {}
+    audio_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     num_shards_rawaudio = 4
-    zenodo_id: Optional[str] = None
+    zenodo_id: str | None = None
 
     # Encoded tar
     force_encoded: bool = False
     encoder: Any = None
-    encoded_tar_name_of_split = {}
+    encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
-    save_encoded_per_batches = 64
-    batch_size_encode = 16
-    num_encoder_workers = 0
+    save_encoded_per_batches:int = 64
+    batch_size_encode:int = 16
+    num_encoder_workers:int = 0
 
     # MLP
     force_retrain_mlp: bool = False
     ckpt_dir_name = "checkpoints"
     ckpt_name = "best.ckpt"
-    batch_size_train = 32
-    learning_rate = 3e-3
-    epochs = 10
-    num_training_workers = 4
-    num_validation_workers = 4
-    model: nn.Module = None
-    output_dim: int = None
+    batch_size_train:int = 32
+    learning_rate:float = 3e-3
+    epochs:int = 10
+    num_training_workers:int = 4
+    num_validation_workers:int = 4
+    model: nn.Module | None = None
+    output_dim: int | None = None
     metric = "accuracy"
 
     def __post_init__(self):
         self.update_tar_name_of_split()
+        if self.env_root is None:
+            self.env_root = self.xares_settings.env_root
 
     def update_tar_name_of_split(self):
         self.audio_tar_name_of_split = {
@@ -84,6 +87,7 @@ class TaskBase(ABC):
         self.mlp = None
 
         self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().strip("task")
+        mkdir_if_not_exists(self.env_dir)
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
 
@@ -250,7 +254,7 @@ class TaskBase(ABC):
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
         dl = create_embedding_webdataset(
-            eval_url, tar_shuffle=2000, batch_size=self.batch_size_train, num_workers=self.num_validation_workers
+            eval_url, batch_size=self.config.batch_size_train, num_workers=self.config.num_validation_workers, label_processor=self.label_processor
         )
         preds, labels = inference(self.mlp, dl)
 

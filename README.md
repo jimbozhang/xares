@@ -73,7 +73,7 @@ The ESC-50 task is used as an example.
 
 ```python
 from example.dasheng.dasheng_encoder import DashengEncoder
-from tasks.esc50.task import ESC50Task
+from tasks.esc50.esc50_task import ESC50Task
 
 task = ESC50Task(encoder=DashengEncoder())
 

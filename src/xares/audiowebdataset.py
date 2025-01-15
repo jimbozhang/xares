@@ -2,7 +2,6 @@
 
 import json
 import multiprocessing
-import random
 from functools import partial
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union  # type: ignore
@@ -38,7 +37,6 @@ def _seq_crop_audio(
     crop_size: Optional[int],
     mono: bool = True,
     drop_clipped: bool = True,
-    remain_random_one_crop: bool = False,
     handler=None,
 ):
     """WebDataset crop filter, yields sequential crops"""
@@ -51,9 +49,6 @@ def _seq_crop_audio(
             continue
         if crop_size is not None:
             crops = crop_or_pad_audio(audio.float(), crop_size=crop_size, pad_last=False)
-            if remain_random_one_crop:
-                crops = list(crops)
-                crops = [crops[random.randint(0, len(crops) - 1)]]
         else:
             crops = [audio.float()]
 
@@ -134,8 +129,11 @@ class Audiowebdataset(wds.DataPipeline):
 
         if batch_size is not None:
             pipeline.append(
-                wds.batched(batch_size, collation_fn=partial(wds.filters.default_collation_fn, combine_tensors=False))
-            )
+                wds.batched(batch_size,
+                            collation_fn=partial(
+                                wds.filters.default_collation_fn,
+                                combine_tensors=False,
+                                combine_scalars=False)))
         super().__init__(pipeline)
 
 
@@ -200,9 +198,6 @@ def collate_with_lengths_wds(
                 b = np.array(list(b))
         else:
             b = list(b)
-            if i == 1 and label_processor is not None:  # i==1 is the label
-                b = [label_processor(x) for x in b]
-
         # Do not flatten lists, i.e., some filenames
         if flatten and not isinstance(b, list):
             result.extend(b)
@@ -223,7 +218,6 @@ def create_rawaudio_webdataset(
     balanced_sampler: Optional[bool] = False,
     num_workers: int = 4,
     training: bool = False,
-    remain_random_one_crop: bool = False,
     **kwargs,
 ):
     dataset_kwargs = dict(
@@ -241,7 +235,6 @@ def create_rawaudio_webdataset(
             drop_clipped=drop_clipped,
             mono=True,
             crop_size=crop_size,
-            remain_random_one_crop=remain_random_one_crop,
         ),
     )
     if balanced_sampler:
@@ -275,13 +268,14 @@ def create_embedding_webdataset(
     label_processor: Optional[Callable] = None,
     **kwargs,
 ):
+
     dataset_kwargs = dict(
         tar_shuffle=tar_shuffle,
         batch_size=batch_size,
-        rename_keys=(
-            dict(embedding="pth", json="json", filename="__key__")
-        ),
-        map_kwargs = dict(embedding=lambda x: x.transpose(-2,-1)) #Transpose (B,T,D) -> (B,D,T)
+        rename_keys=(dict(embedding="pth", json="json", filename="__key__")),
+        map_kwargs=dict(embedding=lambda x: x.transpose(-2, -1),
+                        json=label_processor if label_processor else
+                        lambda x: x)  #Transpose (B,T,D) -> (B,D,T), map the labels if provided
     )
     if balanced_sampler:
         assert isinstance(urls, dict)

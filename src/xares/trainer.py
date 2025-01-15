@@ -28,6 +28,22 @@ MetricType = {
 }
 
 
+def length_to_mask(length):
+    max_length = length.amax().item()
+    idx = torch.arange(max_length,
+                        device=length.device)
+    return idx.unsqueeze(0) < length.unsqueeze(-1)
+
+
+def masked_mean(x, x_length, dim:int=-1):
+    mask = length_to_mask(x_length)
+    mask_target_shape = (len(mask),) +  (1,) * (x.ndim-2) + (mask.shape[-1],)
+    mask = mask.view(mask_target_shape)
+    return (x * mask).sum(dim) / mask.sum(dim)
+
+
+
+
 @dataclass
 class Trainer:
     model: nn.Module
@@ -36,7 +52,7 @@ class Trainer:
     optimizer: str = "Adam"
     lr: float = 3e-3
     max_epochs: int = 10
-    checkpoint_dir: str = "checkpoints"
+    ckpt_dir: str = "checkpoints"
     best_ckpt_path: str | None = None
     ckpt_name: str = "best_model.pt"
     metric: str = "accuracy"
@@ -63,14 +79,14 @@ class Trainer:
 
     @classmethod
     def decode_wds_batch(cls, batch: Tuple):
-        x, y, _ = batch
-        x = x.mean(1)
+        (x,x_length), y, _ = batch
+        x = masked_mean(x, x_length=x_length, dim=-1)
         y = torch.tensor(y)
         return x.to(cls.accelerator.device), y.to(cls.accelerator.device)
 
     def train_step(self, engine:Engine, batch:Tensor) -> Dict[str,Tensor]:
         self.model.train()
-        with torch.enable_grad():
+        with torch.enable_grad(), self.accelerator.accumulate(self.model):
             self.optimizer.zero_grad()
             x, y = self.decode_wds_batch(batch)
             y_pred = self.model(x)
@@ -134,8 +150,7 @@ def inference(model, dl_eval):
 
     with torch.inference_mode():
         model.eval()
-        tqdm_dataloader = tqdm(dl_eval, desc="Evaluating")
-        for batch in tqdm_dataloader:
+        for batch in tqdm(dl_eval, desc="Evaluating"):
             x, y = Trainer.decode_wds_batch(batch)
             y_pred = model(x)
             all_preds.append(y_pred)
