@@ -1,7 +1,6 @@
 import argparse
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from loguru import logger
@@ -11,7 +10,7 @@ from xares.common import XaresSettings
 from xares.utils import mkdir_if_not_exists
 
 
-def make_audio_tar(env_root: Optional[str] = None, force_download=False, force_generate_audio_tar=True, num_shards=4):
+def make_audio_tar(env_root: None | str = None, force_download=False, force_generate_audio_tar=True, num_shards=4):
     settings = XaresSettings()
     target_dir = Path(env_root) if env_root else Path(settings.env_root) / "crema-d"
     audio_tar_ready_file_path = target_dir / settings.audio_ready_filename
