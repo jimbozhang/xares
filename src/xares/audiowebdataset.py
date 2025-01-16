@@ -15,8 +15,6 @@ import webdataset as wds
 from loguru import logger
 
 
-
-
 def fast_warn_and_continue(exn):
     warnings.warn(repr(exn))
     return True
@@ -160,6 +158,7 @@ class BalancedDatasetSampler(wds.DataPipeline, wds.compat.FluidInterface):
                 except StopIteration:
                     break
 
+
 def expand_with_brace(lists: Iterable[str] | str):
     import braceexpand
 
@@ -212,17 +211,19 @@ def collate_with_lengths_wds(
             result.append(b)
     return result
 
-def batched(iterable:Iterable, n:int) -> Iterable:
+
+def batched(iterable: Iterable, n: int) -> Iterable:
     # batched('ABCDEFG', 3) → ABC DEF G
     iterator = iter(iterable)
     while batch := tuple(islice(iterator, n)):
         yield batch
 
+
 # Returns (single) dicts with (audio=audio_data, *extra ), useful for only reading audio and keeping other items the same
 def create_rawaudio_webdataset(
     urls: Union[List[str], Dict[str, List[str]]],
     target_sample_rate: Optional[int] = None,
-    audio_key_name: Literal['audio'] = 'audio', # Just for confirmation that the return dict contains this key
+    audio_key_name: Literal["audio"] = "audio",  # Just for confirmation that the return dict contains this key
     mono: bool = True,
     num_workers:int = 4,
     **kwargs,
@@ -268,9 +269,9 @@ def create_embedding_webdataset(
         tar_shuffle=tar_shuffle,
         batch_size=batch_size,
         rename_keys=(dict(embedding="pth", json="json", filename="__key__")),
-        map_kwargs=dict(embedding=lambda x: x.transpose(-2, -1),
-                        json=label_processor if label_processor else
-                        lambda x: x)  #Transpose (B,T,D) -> (B,D,T), map the labels if provided
+        map_kwargs=dict(
+            embedding=lambda x: x.transpose(-2, -1), json=label_processor if label_processor else lambda x: x
+        ),  # Transpose (B,T,D) -> (B,D,T), map the labels if provided
     )
     if balanced_sampler:
         assert isinstance(urls, dict)
@@ -349,4 +350,3 @@ def write_audio_tar(
                     logger.warning(f"Skipping {audio_path} due to short length.")
                     continue
                 ostream.write(sample)
-

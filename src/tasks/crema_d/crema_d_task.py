@@ -1,13 +1,9 @@
-from pathlib import Path
-
 from xares.task_base import TaskBase
 
 
 class CremaDTask(TaskBase):
     def __init__(self, encoder):
         super().__init__(encoder)
-
-        self.env_dir = Path(self.config.env_root) / "crema_d"
 
         self.config.zenodo_id = "14646870"
         self.config.output_dim = 6

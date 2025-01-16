@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import io
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+<<<<<<< HEAD
 from typing import Any, Callable, Dict, List, Literal, Optional
+=======
+from typing import Any, Dict, List, Literal
+>>>>>>> 9977b7acd26544f1424b65254b7312b6331435eb
 
 import ignite.metrics
 import numpy as np
@@ -12,7 +17,6 @@ import torch
 import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
-import io
 
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset, batched
 from xares.common import XaresSettings
@@ -57,12 +61,12 @@ class TaskConfig:
     ckpt_dir_name = "checkpoints"
     embedding_dir_name = "embeddings"
     ckpt_name = "best.ckpt"
-    criterion: Literal["CrossEntropyLoss","BCEWithLogitsLoss"] = "CrossEntropyLoss"
-    batch_size_train:int = 32
-    learning_rate:float = 3e-3
-    epochs:int = 10
-    num_training_workers:int = 4
-    num_validation_workers:int = 4
+    criterion: Literal["CrossEntropyLoss", "BCEWithLogitsLoss"] = "CrossEntropyLoss"
+    batch_size_train: int = 32
+    learning_rate: float = 3e-3
+    epochs: int = 10
+    num_training_workers: int = 4
+    num_validation_workers: int = 4
     model: nn.Module | None = None
     output_dim: int | None = None
     metric = "accuracy"
@@ -73,16 +77,20 @@ class TaskConfig:
             self.env_root = self.xares_settings.env_root
 
     def update_tar_name_of_split(self):
-        self.audio_tar_name_of_split = {
-            self.train_split: f"{self.train_split}*.tar",
-            self.valid_split: f"{self.valid_split}*.tar",
-            self.test_split: f"{self.test_split}*.tar",
-        }
-        self.encoded_tar_name_of_split = {
-            self.train_split: f"wds-encoded-{self.train_split}*.tar",
-            self.valid_split: f"wds-encoded-{self.valid_split}*.tar",
-            self.test_split: f"wds-encoded-{self.test_split}*.tar",
-        }
+        if self.k_fold_splits is not None:
+            self.audio_tar_name_of_split = {fold: f"wds-audio-fold-{fold}-*.tar" for fold in self.k_fold_splits}
+            self.encoded_tar_name_of_split = {fold: f"wds-encoded-fold-{fold}-*.tar" for fold in self.k_fold_splits}
+        else:
+            self.audio_tar_name_of_split = {
+                self.train_split: f"{self.train_split}*.tar",
+                self.valid_split: f"{self.valid_split}*.tar",
+                self.test_split: f"{self.test_split}*.tar",
+            }
+            self.encoded_tar_name_of_split = {
+                self.train_split: f"wds-encoded-{self.train_split}*.tar",
+                self.valid_split: f"wds-encoded-{self.valid_split}*.tar",
+                self.test_split: f"wds-encoded-{self.test_split}*.tar",
+            }
 
 
 class TaskBase(ABC):
@@ -100,7 +108,7 @@ class TaskBase(ABC):
         self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().rstrip("task")
         self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
-        self.encoded_tar_dir = self.env_dir/ self.config.embedding_dir_name / self.encoder_name
+        self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
         mkdir_if_not_exists(self.encoded_tar_dir)
 
@@ -216,9 +224,9 @@ class TaskBase(ABC):
         encoded_ready_path.touch()
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
-        self.mlp = Mlp(in_features=self.encoder.output_dim,
-                       out_features=self.config.output_dim,
-                       criterion=self.config.criterion).to(self.encoder.device)
+        self.mlp = Mlp(
+            in_features=self.encoder.output_dim, out_features=self.config.output_dim, criterion=self.config.criterion
+        ).to(self.encoder.device)
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
