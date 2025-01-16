@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -84,7 +85,7 @@ class TaskConfig:
 
 
 class TaskBase(ABC):
-    def __init__(self, encoder: Any, config: Optional[TaskConfig] = None):
+    def __init__(self, encoder: Any, config: None | TaskConfig = None):
         logging.captureWarnings(True)
         logging.getLogger("py.warnings").setLevel(logging.ERROR)
 
@@ -260,7 +261,10 @@ class TaskBase(ABC):
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
 
         dl = create_embedding_webdataset(
-            eval_url, batch_size=self.config.batch_size_train, num_workers=self.config.num_validation_workers, label_processor=self.label_processor
+            eval_url,
+            batch_size=self.config.batch_size_train,
+            num_workers=self.config.num_validation_workers,
+            label_processor=self.label_processor,
         )
         preds, labels = inference(self.mlp, dl)
 

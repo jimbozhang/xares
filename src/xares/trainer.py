@@ -1,9 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+import sys
 from typing import Dict, Iterable, Tuple
 
 import torch
-from torch import Tensor
 import torch.nn as nn
 from accelerate import Accelerator
 from ignite.contrib.metrics import AveragePrecision
@@ -11,15 +11,19 @@ from ignite.engine import Engine, Events
 from ignite.handlers.tqdm_logger import ProgressBar
 from ignite.metrics import Accuracy, Loss, RunningAverage
 from loguru import logger
-from torch import nn, optim
+from torch import Tensor, nn, optim
 from tqdm import tqdm
-import sys
+
 # Make the logger with this format the default for all loggers in this package
-logger.configure(handlers=[{
-    "sink": sys.stdout,
-    "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
-    'level': 'DEBUG',
-}])
+logger.configure(
+    handlers=[
+        {
+            "sink": sys.stdout,
+            "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
+            "level": "DEBUG",
+        }
+    ]
+)
 
 
 MetricType = {
@@ -30,18 +34,15 @@ MetricType = {
 
 def length_to_mask(length):
     max_length = length.amax().item()
-    idx = torch.arange(max_length,
-                        device=length.device)
+    idx = torch.arange(max_length, device=length.device)
     return idx.unsqueeze(0) < length.unsqueeze(-1)
 
 
-def masked_mean(x, x_length, dim:int=-1):
+def masked_mean(x, x_length, dim: int = -1):
     mask = length_to_mask(x_length)
-    mask_target_shape = (len(mask),) +  (1,) * (x.ndim-2) + (mask.shape[-1],)
+    mask_target_shape = (len(mask),) + (1,) * (x.ndim - 2) + (mask.shape[-1],)
     mask = mask.view(mask_target_shape)
     return (x * mask).sum(dim) / mask.sum(dim)
-
-
 
 
 @dataclass
@@ -67,27 +68,29 @@ class Trainer:
 
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(self.validation_step)
-        ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(self.ignite_trainer, output_transform=lambda x:x)
-        RunningAverage(output_transform=lambda x: x['loss']).attach(self.ignite_trainer, 'loss_avg')
+        ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(
+            self.ignite_trainer, output_transform=lambda x: x
+        )
+        RunningAverage(output_transform=lambda x: x["loss"]).attach(self.ignite_trainer, "loss_avg")
         ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(self.ignite_evaluator)
 
     @classmethod
     def decode_wds_batch(cls, batch: Tuple):
-        (x,x_length), y, _ = batch
+        (x, x_length), y, _ = batch
         x = masked_mean(x, x_length=x_length, dim=-1)
         y = torch.tensor(y)
         return x.to(cls.accelerator.device), y.to(cls.accelerator.device)
 
-    def train_step(self, engine:Engine, batch:Tensor) -> Dict[str,Tensor]:
+    def train_step(self, engine: Engine, batch: Tensor) -> Dict[str, Tensor]:
         self.model.train()
         with torch.enable_grad(), self.accelerator.accumulate(self.model):
             self.optimizer.zero_grad()
             loss = self.model(*self.decode_wds_batch(batch), return_loss=True)
             self.accelerator.backward(loss)
             self.optimizer.step()
-            return {'loss':loss.item(), 'lr':self.optimizer.param_groups[0]['lr']}
+            return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 
-    def validation_step(self, engine:Engine, batch:Iterable[Tensor]) -> Tuple[Tensor,Tensor]:
+    def validation_step(self, engine: Engine, batch: Iterable[Tensor]) -> Tuple[Tensor, Tensor]:
         self.model.eval()
         with torch.inference_mode():
             y_pred, y = self.model(*self.decode_wds_batch(batch))
@@ -107,7 +110,7 @@ class Trainer:
             self.ignite_evaluator.run(dl_dev)
             metrics = self.ignite_evaluator.state.metrics
             logger.info(
-                    f"Epoch: {trainer.state.epoch} {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
+                f"Epoch: {trainer.state.epoch} {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
             )
             if metrics[self.metric] > self.best_metric:
                 self.best_metric = metrics[self.metric]
