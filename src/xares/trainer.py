@@ -143,7 +143,7 @@ def inference(model, dl_eval):
         model.eval()
         for batch in tqdm(dl_eval, desc="Evaluating"):
             x, y = Trainer.decode_wds_batch(batch)
-            y_pred = model(x)
+            y_pred, y = model(x, y, return_loss=False)
             all_preds.append(y_pred)
             all_targets.append(y)
 
