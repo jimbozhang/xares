@@ -1,6 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+
 import sys
+from dataclasses import dataclass, field
 from typing import Dict, Iterable, Tuple
 
 import torch

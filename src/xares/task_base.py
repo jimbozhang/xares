@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -12,7 +13,6 @@ import torch
 import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
-import io
 
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
@@ -24,10 +24,11 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 @dataclass
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
-    env_root: Path | str | None =  None
-    #General
-    torch_num_threads: int = 1 # Do not use too many otherwise slows down
-    seed:int = 42 # manual seed for all experiments
+    env_root: Path | str | None = None
+
+    # General
+    torch_num_threads: int = 1  # Do not use too many otherwise slows down
+    seed: int = 42  # manual seed for all experiments
 
     # Splits
     train_split: None | str = "train"
@@ -47,21 +48,21 @@ class TaskConfig:
     encoder: Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
-    save_encoded_per_batches:int = 1000
-    batch_size_encode:int = 16
-    num_encoder_workers:int = 0
+    save_encoded_per_batches: int = 1000
+    batch_size_encode: int = 16
+    num_encoder_workers: int = 0
 
     # MLP
     force_retrain_mlp: bool = False
     ckpt_dir_name = "checkpoints"
     embedding_dir_name = "embeddings"
     ckpt_name = "best.ckpt"
-    criterion: Literal["CrossEntropyLoss","BCEWithLogitsLoss"] = "CrossEntropyLoss"
-    batch_size_train:int = 32
-    learning_rate:float = 3e-3
-    epochs:int = 10
-    num_training_workers:int = 4
-    num_validation_workers:int = 4
+    criterion: Literal["CrossEntropyLoss", "BCEWithLogitsLoss"] = "CrossEntropyLoss"
+    batch_size_train: int = 32
+    learning_rate: float = 3e-3
+    epochs: int = 10
+    num_training_workers: int = 4
+    num_validation_workers: int = 4
     model: nn.Module | None = None
     output_dim: int | None = None
     metric = "accuracy"
@@ -99,7 +100,7 @@ class TaskBase(ABC):
         self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().strip("task")
         self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
-        self.encoded_tar_dir = self.env_dir/ self.config.embedding_dir_name / self.encoder_name
+        self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
         mkdir_if_not_exists(self.encoded_tar_dir)
 
@@ -191,7 +192,7 @@ class TaskBase(ABC):
             dl = create_rawaudio_webdataset(
                 [audio_tar_path_of_split[split]],
                 target_sample_rate=self.encoder.required_sampling_rate,
-                audio_key_name='audio',
+                audio_key_name="audio",
             )
             sink = wds.ShardWriter(
                 self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0%05d"),
@@ -201,21 +202,20 @@ class TaskBase(ABC):
                 verbose=False,
             )
 
-
             for sample in tqdm(dl, desc=f"Encoding {split}", leave=True):
-                audio, audio_sr = sample.pop('audio')
+                audio, audio_sr = sample.pop("audio")
                 audio = audio.to(self.encoder.device)
                 embedding = self.encoder(audio).to("cpu").squeeze(0).detach()
                 buf = io.BytesIO()
                 torch.save(embedding, buf)
-                sink.write({'pth': buf.getvalue(), **sample})
+                sink.write({"pth": buf.getvalue(), **sample})
 
         encoded_ready_path.touch()
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
-        self.mlp = Mlp(in_features=self.encoder.output_dim,
-                       out_features=self.config.output_dim,
-                       criterion=self.config.criterion).to(self.encoder.device)
+        self.mlp = Mlp(
+            in_features=self.encoder.output_dim, out_features=self.config.output_dim, criterion=self.config.criterion
+        ).to(self.encoder.device)
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
