@@ -106,7 +106,7 @@ class TaskBase(ABC):
         if self.config.k_fold_splits:
             self.config.train_split = self.config.valid_split = self.config.test_split = None
 
-        self.label_processor = lambda x: x["target"]
+        self.label_processor = lambda x: x["label"]
 
     @abstractmethod
     def run(self) -> float:
