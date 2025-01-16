@@ -5,7 +5,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal
 
 import ignite.metrics
 import numpy as np
@@ -73,16 +73,20 @@ class TaskConfig:
             self.env_root = self.xares_settings.env_root
 
     def update_tar_name_of_split(self):
-        self.audio_tar_name_of_split = {
-            self.train_split: f"wds-audio-{self.train_split}-*.tar",
-            self.valid_split: f"wds-audio-{self.valid_split}-*.tar",
-            self.test_split: f"wds-audio-{self.test_split}-*.tar",
-        }
-        self.encoded_tar_name_of_split = {
-            self.train_split: f"wds-encoded-{self.train_split}-*.tar",
-            self.valid_split: f"wds-encoded-{self.valid_split}-*.tar",
-            self.test_split: f"wds-encoded-{self.test_split}-*.tar",
-        }
+        if self.k_fold_splits is not None:
+            self.audio_tar_name_of_split = {fold: f"wds-audio-fold-{fold}-*.tar" for fold in self.k_fold_splits}
+            self.encoded_tar_name_of_split = {fold: f"wds-encoded-fold-{fold}-*.tar" for fold in self.k_fold_splits}
+        else:
+            self.audio_tar_name_of_split = {
+                self.train_split: f"wds-audio-{self.train_split}-*.tar",
+                self.valid_split: f"wds-audio-{self.valid_split}-*.tar",
+                self.test_split: f"wds-audio-{self.test_split}-*.tar",
+            }
+            self.encoded_tar_name_of_split = {
+                self.train_split: f"wds-encoded-{self.train_split}-*.tar",
+                self.valid_split: f"wds-encoded-{self.valid_split}-*.tar",
+                self.test_split: f"wds-encoded-{self.test_split}-*.tar",
+            }
 
 
 class TaskBase(ABC):
@@ -205,7 +209,7 @@ class TaskBase(ABC):
             for sample in tqdm(dl, desc=f"Encoding {split}", leave=True):
                 audio, audio_sr = sample.pop("audio")
                 audio = audio.to(self.encoder.device)
-                embedding = self.encoder(audio).to("cpu").squeeze(0).detach()
+                embedding = self.encoder(audio, audio_sr).to("cpu").squeeze(0).detach()
                 buf = io.BytesIO()
                 torch.save(embedding, buf)
                 sink.write({"pth": buf.getvalue(), **sample})

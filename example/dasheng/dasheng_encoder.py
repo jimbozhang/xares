@@ -18,6 +18,8 @@ class DashengEncoder:
 
     def __call__(self, audio, sampling_rate):
         audio = self.resample_audio_if_needed(audio, sampling_rate, self.required_sampling_rate)
+        if audio.ndim == 1:
+            audio = audio.unsqueeze(0)
 
         self.model.eval()
         with torch.inference_mode():
