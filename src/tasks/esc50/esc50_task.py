@@ -14,6 +14,7 @@ class ESC50Task(TaskBase):
         self.config.encoded_tar_name_of_split = {
             fold: f"wds-encoded-fold-{fold}-*.tar" for fold in self.config.k_fold_splits
         }
+        self.label_processor = lambda x: x["label"]
         self.config.output_dim = 50
 
     def run(self) -> float:

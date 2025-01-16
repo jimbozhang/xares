@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal, Optional
 
 import ignite.metrics
 import numpy as np
@@ -12,8 +12,9 @@ import torch
 import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
+import io
 
-from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset, write_encoded_batches_to_wds
+from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.models import Mlp
 from xares.trainer import MetricType, Trainer, inference
@@ -23,7 +24,10 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 @dataclass
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
-    env_root: Path | str | None = None
+    env_root: Path | str | None =  None
+    #General
+    torch_num_threads: int = 1 # Do not use too many otherwise slows down
+    seed:int = 42 # manual seed for all experiments
 
     # Splits
     train_split: None | str = "train"
@@ -43,19 +47,21 @@ class TaskConfig:
     encoder: Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
-    save_encoded_per_batches: int = 64
-    batch_size_encode: int = 16
-    num_encoder_workers: int = 0
+    save_encoded_per_batches:int = 1000
+    batch_size_encode:int = 16
+    num_encoder_workers:int = 0
 
     # MLP
     force_retrain_mlp: bool = False
     ckpt_dir_name = "checkpoints"
+    embedding_dir_name = "embeddings"
     ckpt_name = "best.ckpt"
-    batch_size_train: int = 32
-    learning_rate: float = 3e-3
-    epochs: int = 10
-    num_training_workers: int = 4
-    num_validation_workers: int = 4
+    criterion: Literal["CrossEntropyLoss","BCEWithLogitsLoss"] = "CrossEntropyLoss"
+    batch_size_train:int = 32
+    learning_rate:float = 3e-3
+    epochs:int = 10
+    num_training_workers:int = 4
+    num_validation_workers:int = 4
     model: nn.Module | None = None
     output_dim: int | None = None
     metric = "accuracy"
@@ -86,16 +92,21 @@ class TaskBase(ABC):
         self.config = config or TaskConfig()
         self.encoder = encoder
         self.mlp = None
+        torch.set_num_threads(self.config.torch_num_threads)
+        torch.manual_seed(self.config.seed)
+        np.random.seed(self.config.seed)
 
         self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().strip("task")
-        mkdir_if_not_exists(self.env_dir)
-        self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name
+        self.encoder_name = encoder.__class__.__name__
+        self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
+        self.encoded_tar_dir = self.env_dir/ self.config.embedding_dir_name / self.encoder_name
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
+        mkdir_if_not_exists(self.encoded_tar_dir)
 
         if self.config.k_fold_splits:
             self.config.train_split = self.config.valid_split = self.config.test_split = None
 
-        self.label_processor = lambda x: x["target"]
+        self.label_processor = lambda x: x["label"]
 
     @abstractmethod
     def run(self) -> float:
@@ -154,11 +165,11 @@ class TaskBase(ABC):
 
     def default_make_encoded_tar(self):
         self.encoded_tar_path_of_split = {
-            split: (self.env_dir / self.config.encoded_tar_name_of_split[split])
+            split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
             for split in self.config.encoded_tar_name_of_split
         }
 
-        encoded_ready_path = self.env_dir / self.config.xares_settings.encoded_ready_filename
+        encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
         if not self.config.force_encoded and encoded_ready_path.exists():
             logger.info(f"Skip making encoded tar.")
             return
@@ -173,43 +184,38 @@ class TaskBase(ABC):
             for split in self.config.audio_tar_name_of_split
         }
 
+        import webdataset as wds
+
         for split in audio_tar_path_of_split:
             logger.info(f"Encoding audio for split {split} ...")
-
             dl = create_rawaudio_webdataset(
                 [audio_tar_path_of_split[split]],
-                batch_size=self.config.batch_size_encode,
-                num_workers=self.config.num_encoder_workers,
-                crop_size=self.config.trim_length,
-                with_json=True,
+                target_sample_rate=self.encoder.required_sampling_rate,
+                audio_key_name='audio',
+            )
+            sink = wds.ShardWriter(
+                self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0%05d"),
+                encoder=False,
+                compress=False,
+                maxcount=self.config.save_encoded_per_batches,
+                verbose=False,
             )
 
-            batch_buf = []
-            shard = 0
-            for batch, _, label, keys in tqdm(dl, desc=f"Encoding {split}"):
-                batch = batch.to(self.encoder.device)
-                encoded_batch = self.encoder(batch, 44_100).to("cpu").detach()
-                batch_buf.append([encoded_batch, label, keys])
 
-                if len(batch_buf) >= self.config.save_encoded_per_batches:
-                    write_encoded_batches_to_wds(
-                        batch_buf,
-                        self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0{shard:05d}"),
-                        num_workers=self.config.num_encoder_workers,
-                    )
-                    batch_buf.clear()
-                    shard += 1
+            for sample in tqdm(dl, desc=f"Encoding {split}", leave=True):
+                audio, audio_sr = sample.pop('audio')
+                audio = audio.to(self.encoder.device)
+                embedding = self.encoder(audio).to("cpu").squeeze(0).detach()
+                buf = io.BytesIO()
+                torch.save(embedding, buf)
+                sink.write({'pth': buf.getvalue(), **sample})
 
-            if len(batch_buf) > 0:
-                write_encoded_batches_to_wds(
-                    batch_buf,
-                    self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0{shard:05d}"),
-                    num_workers=self.config.num_encoder_workers,
-                )
         encoded_ready_path.touch()
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
-        self.mlp = Mlp(in_features=self.encoder.output_dim, out_features=self.config.output_dim).to(self.encoder.device)
+        self.mlp = Mlp(in_features=self.encoder.output_dim,
+                       out_features=self.config.output_dim,
+                       criterion=self.config.criterion).to(self.encoder.device)
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
