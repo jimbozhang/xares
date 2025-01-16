@@ -1,10 +1,11 @@
 # Reduced from `xiaomitts/common/audiowebdataset.py`
 
 import json
-import multiprocessing
 from functools import partial
+from io import BytesIO
+from itertools import islice
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union  # type: ignore
+from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union  # type: ignore
 
 import numpy as np
 import torch
@@ -12,6 +13,8 @@ import torchaudio
 import webdataset as wds
 import warnings
 from loguru import logger
+
+
 
 
 def fast_warn_and_continue(exn):
@@ -48,7 +51,7 @@ def _seq_crop_audio(
         if audio.abs().max() >= 0.99 and drop_clipped:
             continue
         if crop_size is not None:
-            crops = crop_or_pad_audio(audio.float(), crop_size=crop_size, pad_last=False)
+            crops = crop_or_pad_audio(audio.float(), crop_size=(crop_size * sr), pad_last=False)
         else:
             crops = [audio.float()]
 
@@ -154,7 +157,7 @@ class BalancedDatasetSampler(wds.DataPipeline, wds.compat.FluidInterface):
                 except StopIteration:
                     break
 
-def expand_with_brace(lists: List[str]):
+def expand_with_brace(lists: Iterable[str] | str):
     import braceexpand
     r = []
     for l in lists:
@@ -205,57 +208,41 @@ def collate_with_lengths_wds(
             result.append(b)
     return result
 
+def batched(iterable:Iterable, n:int) -> Iterable:
+    # batched('ABCDEFG', 3) → ABC DEF G
+    iterator = iter(iterable)
+    while batch := tuple(islice(iterator, n)):
+        yield batch
 
+# Returns (single) dicts with (audio=audio_data, *extra ), useful for only reading audio and keeping other items the same
 def create_rawaudio_webdataset(
     urls: Union[List[str], Dict[str, List[str]]],
-    tar_shuffle: Optional[int] = None,
-    resample: Optional[bool] = None,
-    batch_size: int = 16,
-    drop_clipped: bool = False,
     target_sample_rate: Optional[int] = None,
-    crop_size: Optional[int] = None,
-    with_json: bool = False,
-    balanced_sampler: Optional[bool] = False,
-    num_workers: int = 4,
-    training: bool = False,
+    audio_key_name: Literal['audio'] = 'audio', # Just for confirmation that the return dict contains this key
+    mono: bool = True,
     **kwargs,
 ):
-    dataset_kwargs = dict(
-        tar_shuffle=tar_shuffle,
-        target_sample_rate=target_sample_rate,
-        resample=resample,
-        batch_size=batch_size,
-        rename_keys=(
-            dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", json="json", filename="__key__")
-            if with_json
-            else dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", filename="__key__")
-        ),
-        merge_function=partial(
-            _seq_crop_audio,
-            drop_clipped=drop_clipped,
-            mono=True,
-            crop_size=crop_size,
-        ),
-    )
-    if balanced_sampler:
-        assert isinstance(urls, dict)
-        ds = {k: Audiowebdataset(expand_with_brace(train_data), **dataset_kwargs) for k, train_data in urls.items()}
-        dataset = BalancedDatasetSampler(**ds)
-    else:
-        assert isinstance(urls, list)
-        dataset = Audiowebdataset(expand_with_brace(urls), **dataset_kwargs)
-    dataloader = wds.WebLoader(
-        dataset,
-        batch_size=None,
-        num_workers=num_workers,
-    ).unbatched()
-    if training:
-        dataloader = dataloader.shuffle(512)
-    dataloader = dataloader.batched(
-        batch_size,
-        collation_fn=collate_with_lengths_wds,
-    )
-    return dataloader
+    def decode_resample_audio(audio_stream: bytes) -> Tuple[torch.Tensor, int]:
+        wav_file_bytesIO = BytesIO(audio_stream)
+        audio_sr = torchaudio.load(wav_file_bytesIO)
+        audio, sr = audio_sr
+        if mono and audio.ndim == 2:
+            audio = audio.mean(0)
+            audio_sr = (audio, sr)
+        if target_sample_rate is None:
+            return audio_sr
+        audio = torchaudio.functional.resample(audio, sr, target_sample_rate)
+        return (audio, target_sample_rate)
+
+    dataset = wds.DataPipeline(
+            wds.SimpleShardList(expand_with_brace(urls)),
+            wds.split_by_node,
+            wds.split_by_worker,
+            wds.tarfile_to_samples(),
+            wds.rename(**{audio_key_name:"flac;mp3;sox;wav;m4a;ogg;wma"}),
+            wds.map_dict(**{audio_key_name:decode_resample_audio}),
+            )
+    return dataset
 
 
 def create_embedding_webdataset(
@@ -349,28 +336,3 @@ def write_audio_tar(
                     continue
                 ostream.write(sample)
 
-
-def batch_to_sample(example, label, key):
-    sample = {
-        "pth": example,
-        "json": (
-            json.dumps(label).encode("utf-8")
-            if isinstance(label, dict)
-            else json.dumps({"target": label["label"]}).encode("utf-8")
-        ),
-        "__key__": key,
-    }
-    return sample
-
-
-def write_encoded_batches_to_wds(encoded_batches: List, tar_path: str, num_workers: int = 0):
-    with wds.TarWriter(tar_path) as ostream:
-        if num_workers == 0:
-            for batch, label, keys in encoded_batches:
-                for return_values in map(batch_to_sample, batch, label, keys):
-                    ostream.write(return_values)
-        else:
-            with multiprocessing.Pool(processes=num_workers) as pool:
-                for batch, label, keys in encoded_batches:
-                    for return_values in pool.starmap(batch_to_sample, zip(batch, label, keys)):
-                        ostream.write(return_values)
