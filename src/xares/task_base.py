@@ -5,11 +5,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-<<<<<<< HEAD
-from typing import Any, Callable, Dict, List, Literal, Optional
-=======
-from typing import Any, Dict, List, Literal
->>>>>>> 9977b7acd26544f1424b65254b7312b6331435eb
+from typing import Any, Dict, List, Literal, Callable
 
 import ignite.metrics
 import numpy as np
