@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Iterable, Tuple
 
 import torch
@@ -47,8 +47,7 @@ def masked_mean(x, x_length, dim:int=-1):
 @dataclass
 class Trainer:
     model: nn.Module
-    accelerator :Accelerator = Accelerator()
-    criterion: str = "CrossEntropyLoss"
+    accelerator: Accelerator = Accelerator()
     optimizer: str = "Adam"
     lr: float = 3e-3
     max_epochs: int = 10
@@ -61,11 +60,6 @@ class Trainer:
     save_model: bool = True
 
     def __post_init__(self):
-        try:
-            self.criterion = getattr(nn.modules.loss, self.criterion)()
-        except AttributeError:
-            raise NotImplementedError(f"Loss {self.criterion} not implemented.")
-
         try:
             self.optimizer = getattr(optim, self.optimizer)(self.model.parameters(), lr=self.lr)
         except AttributeError:
@@ -88,9 +82,7 @@ class Trainer:
         self.model.train()
         with torch.enable_grad(), self.accelerator.accumulate(self.model):
             self.optimizer.zero_grad()
-            x, y = self.decode_wds_batch(batch)
-            y_pred = self.model(x)
-            loss = self.criterion(y_pred, y)
+            loss = self.model(*self.decode_wds_batch(batch), return_loss=True)
             self.accelerator.backward(loss)
             self.optimizer.step()
             return {'loss':loss.item(), 'lr':self.optimizer.param_groups[0]['lr']}
@@ -98,8 +90,7 @@ class Trainer:
     def validation_step(self, engine:Engine, batch:Iterable[Tensor]) -> Tuple[Tensor,Tensor]:
         self.model.eval()
         with torch.inference_mode():
-            x, y = self.decode_wds_batch(batch)
-            y_pred = self.model(x)
+            y_pred, y = self.model(*self.decode_wds_batch(batch))
             return y_pred, y
 
     def run(self, dl_train, dl_dev):
@@ -107,7 +98,7 @@ class Trainer:
             self.model, self.optimizer, dl_train, dl_dev
         )
 
-        metrics = {"loss": Loss(self.criterion), self.metric: MetricType[self.metric]()}
+        metrics = {"loss": Loss(self.model.criterion), self.metric: MetricType[self.metric]()}
         for name, metric in metrics.items():
             metric.attach(self.ignite_evaluator, name)
 
