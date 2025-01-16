@@ -73,14 +73,14 @@ class TaskConfig:
 
     def update_tar_name_of_split(self):
         self.audio_tar_name_of_split = {
-            self.train_split: f"wds-audio-{self.train_split}-*.tar",
-            self.valid_split: f"wds-audio-{self.valid_split}-*.tar",
-            self.test_split: f"wds-audio-{self.test_split}-*.tar",
+            self.train_split: f"wds-audio-{self.train_split}*.tar",
+            self.valid_split: f"wds-audio-{self.valid_split}*.tar",
+            self.test_split: f"wds-audio-{self.test_split}*.tar",
         }
         self.encoded_tar_name_of_split = {
-            self.train_split: f"wds-encoded-{self.train_split}-*.tar",
-            self.valid_split: f"wds-encoded-{self.valid_split}-*.tar",
-            self.test_split: f"wds-encoded-{self.test_split}-*.tar",
+            self.train_split: f"wds-encoded-{self.train_split}*.tar",
+            self.valid_split: f"wds-encoded-{self.valid_split}*.tar",
+            self.test_split: f"wds-encoded-{self.test_split}*.tar",
         }
 
 
@@ -96,7 +96,7 @@ class TaskBase(ABC):
         torch.manual_seed(self.config.seed)
         np.random.seed(self.config.seed)
 
-        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().strip("task")
+        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().rstrip("task")
         self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir/ self.config.embedding_dir_name / self.encoder_name
@@ -188,6 +188,7 @@ class TaskBase(ABC):
 
         for split in audio_tar_path_of_split:
             logger.info(f"Encoding audio for split {split} ...")
+            logger.debug(f"Using data from {audio_tar_path_of_split[split]} ... ")
             dl = create_rawaudio_webdataset(
                 [audio_tar_path_of_split[split]],
                 target_sample_rate=self.encoder.required_sampling_rate,
