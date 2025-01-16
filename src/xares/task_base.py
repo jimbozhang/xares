@@ -5,7 +5,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Literal
+from typing import Any, Callable, Dict, List, Literal
 
 import ignite.metrics
 import numpy as np
@@ -14,7 +14,7 @@ import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
 
-from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
+from xares.audiowebdataset import batched, create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.models import Mlp
 from xares.trainer import MetricType, Trainer, inference
@@ -25,10 +25,10 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
     env_root: Path | str | None = None
-
     # General
     torch_num_threads: int = 1  # Do not use too many otherwise slows down
     seed: int = 42  # manual seed for all experiments
+    label_processor: Callable = field(default=lambda x: x)
 
     # Splits
     train_split: None | str = "train"
@@ -50,7 +50,7 @@ class TaskConfig:
     trim_length = None
     save_encoded_per_batches: int = 1000
     batch_size_encode: int = 16
-    num_encoder_workers: int = 0
+    num_encoder_workers: int = 4
 
     # MLP
     force_retrain_mlp: bool = False
@@ -78,14 +78,14 @@ class TaskConfig:
             self.encoded_tar_name_of_split = {fold: f"wds-encoded-fold-{fold}-*.tar" for fold in self.k_fold_splits}
         else:
             self.audio_tar_name_of_split = {
-                self.train_split: f"wds-audio-{self.train_split}-*.tar",
-                self.valid_split: f"wds-audio-{self.valid_split}-*.tar",
-                self.test_split: f"wds-audio-{self.test_split}-*.tar",
+                self.train_split: f"{self.train_split}*.tar",
+                self.valid_split: f"{self.valid_split}*.tar",
+                self.test_split: f"{self.test_split}*.tar",
             }
             self.encoded_tar_name_of_split = {
-                self.train_split: f"wds-encoded-{self.train_split}-*.tar",
-                self.valid_split: f"wds-encoded-{self.valid_split}-*.tar",
-                self.test_split: f"wds-encoded-{self.test_split}-*.tar",
+                self.train_split: f"wds-encoded-{self.train_split}*.tar",
+                self.valid_split: f"wds-encoded-{self.valid_split}*.tar",
+                self.test_split: f"wds-encoded-{self.test_split}*.tar",
             }
 
 
@@ -101,7 +101,7 @@ class TaskBase(ABC):
         torch.manual_seed(self.config.seed)
         np.random.seed(self.config.seed)
 
-        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().strip("task")
+        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().rstrip("task")
         self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
@@ -111,7 +111,7 @@ class TaskBase(ABC):
         if self.config.k_fold_splits:
             self.config.train_split = self.config.valid_split = self.config.test_split = None
 
-        self.label_processor = lambda x: x["label"]
+        self.label_processor = self.config.label_processor
 
     @abstractmethod
     def run(self) -> float:
@@ -193,10 +193,12 @@ class TaskBase(ABC):
 
         for split in audio_tar_path_of_split:
             logger.info(f"Encoding audio for split {split} ...")
+            logger.debug(f"Using data from {audio_tar_path_of_split[split]} ... ")
             dl = create_rawaudio_webdataset(
                 [audio_tar_path_of_split[split]],
                 target_sample_rate=self.encoder.required_sampling_rate,
                 audio_key_name="audio",
+                num_workers=self.config.num_encoder_workers,
             )
             sink = wds.ShardWriter(
                 self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0%05d"),
@@ -206,13 +208,14 @@ class TaskBase(ABC):
                 verbose=False,
             )
 
-            for sample in tqdm(dl, desc=f"Encoding {split}", leave=True):
-                audio, audio_sr = sample.pop("audio")
-                audio = audio.to(self.encoder.device)
-                embedding = self.encoder(audio, audio_sr).to("cpu").squeeze(0).detach()
-                buf = io.BytesIO()
-                torch.save(embedding, buf)
-                sink.write({"pth": buf.getvalue(), **sample})
+            with torch.inference_mode():
+                for sample in tqdm(dl, desc=f"Encoding {split}", leave=True):
+                    audio, audio_sr = sample.pop("audio")
+                    audio = audio.to(self.encoder.device)
+                    embedding = self.encoder(audio).to("cpu").squeeze(0).detach()
+                    buf = io.BytesIO()
+                    torch.save(embedding, buf)
+                    sink.write({"pth": buf.getvalue(), **sample})
 
         encoded_ready_path.touch()
 

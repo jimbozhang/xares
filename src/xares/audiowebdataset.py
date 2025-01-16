@@ -225,6 +225,7 @@ def create_rawaudio_webdataset(
     target_sample_rate: Optional[int] = None,
     audio_key_name: Literal["audio"] = "audio",  # Just for confirmation that the return dict contains this key
     mono: bool = True,
+    num_workers: int = 4,
     **kwargs,
 ):
     def decode_resample_audio(audio_stream: bytes) -> Tuple[torch.Tensor, int]:
@@ -239,15 +240,19 @@ def create_rawaudio_webdataset(
         audio = torchaudio.functional.resample(audio, sr, target_sample_rate)
         return (audio, target_sample_rate)
 
+    urls = expand_with_brace(urls)
+
     dataset = wds.DataPipeline(
-        wds.SimpleShardList(expand_with_brace(urls)),
+        wds.SimpleShardList(urls),
         wds.split_by_node,
         wds.split_by_worker,
         wds.tarfile_to_samples(),
         wds.rename(**{audio_key_name: "flac;mp3;sox;wav;m4a;ogg;wma"}),
         wds.map_dict(**{audio_key_name: decode_resample_audio}),
     )
-    return dataset
+    # Set num_workers at most to number of tars, otherwise some processes will do nothing, slowing down dataloading
+    dataloader = wds.WebLoader(dataset, num_workers=min(len(urls), num_workers), batch_size=None)
+    return dataloader
 
 
 def create_embedding_webdataset(
