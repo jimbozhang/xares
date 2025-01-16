@@ -5,7 +5,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Callable
+from typing import Any, Callable, Dict, List, Literal
 
 import ignite.metrics
 import numpy as np
@@ -14,7 +14,7 @@ import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
 
-from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset, batched
+from xares.audiowebdataset import batched, create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.models import Mlp
 from xares.trainer import MetricType, Trainer, inference
@@ -24,11 +24,11 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 @dataclass
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
-    env_root: Path | str | None =  None
-    #General
-    torch_num_threads: int = 1 # Do not use too many otherwise slows down
-    seed:int = 42 # manual seed for all experiments
-    label_processor: Callable = field(default = lambda x: x)
+    env_root: Path | str | None = None
+    # General
+    torch_num_threads: int = 1  # Do not use too many otherwise slows down
+    seed: int = 42  # manual seed for all experiments
+    label_processor: Callable = field(default=lambda x: x)
 
     # Splits
     train_split: None | str = "train"
@@ -48,9 +48,9 @@ class TaskConfig:
     encoder: Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
-    save_encoded_per_batches:int = 1000
-    batch_size_encode:int = 16
-    num_encoder_workers:int = 4
+    save_encoded_per_batches: int = 1000
+    batch_size_encode: int = 16
+    num_encoder_workers: int = 4
 
     # MLP
     force_retrain_mlp: bool = False
@@ -197,7 +197,7 @@ class TaskBase(ABC):
             dl = create_rawaudio_webdataset(
                 [audio_tar_path_of_split[split]],
                 target_sample_rate=self.encoder.required_sampling_rate,
-                audio_key_name='audio',
+                audio_key_name="audio",
                 num_workers=self.config.num_encoder_workers,
             )
             sink = wds.ShardWriter(
@@ -210,12 +210,12 @@ class TaskBase(ABC):
 
             with torch.inference_mode():
                 for sample in tqdm(dl, desc=f"Encoding {split}", leave=True):
-                    audio, audio_sr = sample.pop('audio')
+                    audio, audio_sr = sample.pop("audio")
                     audio = audio.to(self.encoder.device)
                     embedding = self.encoder(audio).to("cpu").squeeze(0).detach()
                     buf = io.BytesIO()
                     torch.save(embedding, buf)
-                    sink.write({'pth': buf.getvalue(), **sample})
+                    sink.write({"pth": buf.getvalue(), **sample})
 
         encoded_ready_path.touch()
 
