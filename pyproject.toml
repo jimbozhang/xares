@@ -19,7 +19,7 @@ dependencies = [
   "pytorch-ignite==0.5.1",
   "pyyaml",
   "tqdm",
-  "webdataset==0.2.100",
+  "webdataset>=0.2.107",
   "pysoundfile",
 ]
 authors = [
