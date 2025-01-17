@@ -46,6 +46,9 @@ def masked_mean(x, x_length, dim: int = -1):
     return (x * mask).sum(dim) / mask.sum(dim)
 
 
+def cast_to_tensor(y: Iterable):
+    return torch.tensor(y) if not isinstance(y, torch.Tensor) else y
+
 @dataclass
 class Trainer:
     model: nn.Module
@@ -79,7 +82,7 @@ class Trainer:
     def decode_wds_batch(cls, batch: Tuple):
         (x, x_length), y, _ = batch
         x = masked_mean(x, x_length=x_length, dim=-1)
-        y = torch.tensor(y)
+        y = cast_to_tensor(y)
         return x.to(cls.accelerator.device), y.to(cls.accelerator.device)
 
     def train_step(self, engine: Engine, batch: Tensor) -> Dict[str, Tensor]:

@@ -65,7 +65,7 @@ class TaskConfig:
     num_validation_workers: int = 4
     model: nn.Module | None = None
     output_dim: int | None = None
-    metric = "accuracy"
+    metric: Literal["accuracy"] = "accuracy"
 
     def __post_init__(self):
         self.update_tar_name_of_split()
@@ -101,7 +101,7 @@ class TaskBase(ABC):
         torch.manual_seed(self.config.seed)
         np.random.seed(self.config.seed)
 
-        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().rstrip("task")
+        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().replace("task", "")
         self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
