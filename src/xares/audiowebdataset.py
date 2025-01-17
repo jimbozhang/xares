@@ -248,7 +248,7 @@ def create_rawaudio_webdataset(
         wds.split_by_worker,
         wds.tarfile_to_samples(),
         wds.rename(**{audio_key_name: "flac;mp3;sox;wav;m4a;ogg;wma"}),
-        wds.map_dict(**{audio_key_name: decode_resample_audio}),
+        wds.map_dict(**{audio_key_name: decode_resample_audio}, handler=fast_warn_and_continue),
     )
     # Set num_workers at most to number of tars, otherwise some processes will do nothing, slowing down dataloading
     dataloader = wds.WebLoader(dataset, num_workers=min(len(urls), num_workers), batch_size=None)
