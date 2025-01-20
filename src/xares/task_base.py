@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal
 from accelerate import Accelerator
 
-import ignite.metrics
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,9 +19,12 @@ from tqdm import tqdm
 import webdataset as wds
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
+from xares.metrics import METRICS_TYPE
 from xares.models import Mlp
-from xares.trainer import MetricType, Trainer
+from xares.trainer import Trainer
 from xares.utils import download_zenodo_record, mkdir_if_not_exists
+
+
 
 
 @dataclass
@@ -62,15 +64,15 @@ class TaskConfig:
     ckpt_dir_name = "checkpoints"
     embedding_dir_name = "embeddings"
     ckpt_name = "best.ckpt"
-    criterion: Literal["CrossEntropyLoss", "BCEWithLogitsLoss"] = "CrossEntropyLoss"
+    criterion: Literal["CrossEntropyLoss", "BCEWithLogitsLoss", "L1Loss", "MSELoss"] = "CrossEntropyLoss"
     batch_size_train: int = 32
-    learning_rate: float = 3e-3
+    learning_rate: float = 1e-3
     epochs: int = 10
     num_training_workers: int = 4
     num_validation_workers: int = 4
     model: nn.Module | None = None
     output_dim: int | None = None
-    metric: Literal["accuracy"] = "accuracy"
+    metric: Literal["accuracy","EER","mAP","recall@k","MAE", "MSE"] = "accuracy"
 
     def __post_init__(self):
         self.update_tar_name_of_split()
@@ -131,14 +133,14 @@ class TaskBase(ABC):
         self.label_processor = self.config.label_processor
 
     @abstractmethod
-    def run(self) -> float:
+    def run(self):
         pass
 
     @abstractmethod
     def make_encoded_tar(self):
         pass
 
-    def default_run(self) -> float:
+    def default_run(self) -> Dict[str, Any]:
         self.make_encoded_tar()
 
         self.train_mlp(
@@ -147,10 +149,8 @@ class TaskBase(ABC):
         )
         score = self.evaluate_mlp(
             [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
-            metric=self.config.metric,
             load_ckpt=True,
         )
-        logger.info(f"Score: {score}")
         return score
 
     def default_run_k_fold(self) -> float | np.floating | np.ndarray | torch.Tensor:
@@ -171,7 +171,7 @@ class TaskBase(ABC):
             )
             acc.append(
                 self.evaluate_mlp(
-                    [self.encoded_tar_path_of_split[k].as_posix()], metric=self.config.metric, load_ckpt=True
+                    [self.encoded_tar_path_of_split[k].as_posix()], load_ckpt=True
                 )
             )
 
@@ -245,12 +245,12 @@ class TaskBase(ABC):
 
         self.trainer = Trainer(
             mlp,
-            accelerator=self.accelerator,
             ckpt_dir=self.ckpt_dir,
             ckpt_name=self.config.ckpt_name,
             metric=self.config.metric,
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
+
         )
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
@@ -277,7 +277,7 @@ class TaskBase(ABC):
 
         self.trainer.run(dl_train, dl_val)
 
-    def evaluate_mlp(self, eval_url: list, metric: str = "Accuracy", load_ckpt: bool = False) -> float:
+    def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Dict[METRICS_TYPE,Any]:
         if self.trainer is None:
             raise ValueError("Train the model first before evaluation.")
 
@@ -294,16 +294,9 @@ class TaskBase(ABC):
             num_workers=self.config.num_validation_workers,
             label_processor=self.label_processor,
         )
-        preds, labels = self.trainer.run_inference(dl)
-
-        metric_func = MetricType[metric].__name__
-        try:
-            evaluator = getattr(ignite.metrics, metric_func)()
-        except AttributeError:
-            raise ValueError(f"Metric {metric} not found in ignite.metrics")
-        evaluator.update(output=(preds, labels))
-        result = evaluator.compute()
-        logger.info(f"{metric}: {result}")
+        result = self.trainer.run_inference(dl)
+        for k,v in result.items():
+            logger.info(f"{k}: {v}")
         return result
 
     def train_knn(self):

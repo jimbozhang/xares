@@ -1,20 +1,29 @@
 from xares.task_base import TaskBase, TaskConfig
 
 
-class ASVSpoof2015Task(TaskBase):
+class FreeMusicArchiveTask(TaskBase):
     def __init__(self, encoder):
-        data_key = "binary_spoof"
-        self.class_label_maps = {"human": 0, "spoof": 1}
+        data_key = "genre"
+        self.class_label_maps = {
+            "Hip-Hop": 0,
+            "Pop": 1,
+            "Folk": 2,
+            "Experimental": 3,
+            "Rock": 4,
+            "International": 5,
+            "Electronic": 6,
+            "Instrumental": 7,
+        }
         task_config = TaskConfig(
             batch_size_train=64,
             learning_rate=1e-3,
-            train_split="asvspoof_train",
-            valid_split="asvspoof_valid",
-            test_split="asvspoof_eval",
+            train_split="fma_small_train",
+            valid_split="fma_small_valid",
+            test_split="fma_small_test",
             zenodo_id="TODO",
             output_dim=len(self.class_label_maps),
             label_processor=lambda x: self.class_label_maps[x[data_key]],
-            batch_size_encode=64,
+            crop_length=10, #10s
         )
         super().__init__(encoder, config=task_config)
 

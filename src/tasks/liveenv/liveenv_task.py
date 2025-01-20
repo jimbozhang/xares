@@ -36,14 +36,12 @@ class LiveEnvTask(TaskBase):
         }
         task_config = TaskConfig(
             batch_size_train=64,
-            learning_rate=1e-3,
             train_split="liveenv_train",
             valid_split="liveenv_test",
             test_split="liveenv_test",
             zenodo_id="TODO",
             output_dim=len(self.class_label_maps),
             label_processor=lambda x: self.class_label_maps[x[data_key]],
-            epochs=50,
         )
         super().__init__(encoder, config=task_config)
 

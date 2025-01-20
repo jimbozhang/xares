@@ -1,25 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Callable, Dict, Iterable, Literal, Tuple
-from ignite.handlers import EpochOutputStore, global_step_from_engine
+from dataclasses import InitVar, dataclass, field
+from typing import Any, Callable, Dict, Iterable, Literal, Tuple
+from ignite.handlers import CosineAnnealingScheduler, EpochOutputStore, global_step_from_engine
+from ignite.metrics import Loss, RunningAverage
 
 import torch
 import torch.nn as nn
-from accelerate import Accelerator
-from ignite.contrib.metrics import AveragePrecision
 from ignite.engine import Engine, Events
 from ignite.handlers.tqdm_logger import ProgressBar
-from ignite.metrics import Accuracy, Loss, RunningAverage
 from loguru import logger
 from torch import Tensor, nn, optim
+from xares.metrics import ALL_METRICS, METRICS_TYPE
 
-
-
-MetricType = {
-    "accuracy": Accuracy,
-    "mAP": AveragePrecision,
-}
 
 
 def length_to_mask(length):
@@ -36,7 +29,8 @@ def masked_mean(x, x_length, dim: int = -1):
 
 
 def cast_to_tensor(y: Iterable):
-    return torch.tensor(y) if not isinstance(y, torch.Tensor) else y
+    y = torch.tensor(y) if not isinstance(y, torch.Tensor) else y
+    return y.float() if y.is_floating_point() else y
 
 
 def prepare_wds_batch_default(batch: Tuple,
@@ -57,26 +51,20 @@ def default_validation_func(model:torch.nn.Module, device: torch.device | str = 
 
 
 @dataclass
-class EvalMetric:
-    metric : Callable
-    score: float = 1. # can also be -1
-
-
-@dataclass
 class Trainer:
     model: nn.Module
-    accelerator: Accelerator = field(default_factory=Accelerator())
     validation_func: Callable | None = None
+    device: torch.device | Literal['cpu'] = field(default_factory=lambda : torch.device('cpu'))
     optimizer: str = "Adam"
     lr: float = 3e-3
     max_epochs: int = 10
     ckpt_dir: str = "checkpoints"
     best_ckpt_path: str | None = None
     ckpt_name: str = "best_model.pt"
-    metric: str = "accuracy"
+    metric: METRICS_TYPE = "accuracy"
     label_name: str = "target"
-    best_metric: float = 0.0
     save_model: bool = True
+    decay_fraction: float = 0.1 # Decay learning rate
 
     def __post_init__(self):
         try:
@@ -86,39 +74,42 @@ class Trainer:
 
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(
-            default_validation_func(self.model, device=self.accelerator.device)
+            default_validation_func(self.model, device=self.device)
             if self.validation_func is None else self.
-            validation_func(self.model, device=self.accelerator.device))
-        self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
+            validation_func(self.model, device=self.device))
+        # Schedule cosine annealing during training
+        scheduler = CosineAnnealingScheduler(
+                self.optimizer, 'lr', self.optimizer.param_groups[0]['lr'],
+                self.lr * self.decay_fraction, self.max_epochs)
+        self.ignite_trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
+
+        self.model = self.model.to(self.device)
+        self._metric_obj = ALL_METRICS[self.metric]
         ProgressBar(bar_format=None,
-                    disable=not self.accelerator.is_main_process).attach(
+                    ).attach(
                         self.ignite_trainer, output_transform=lambda x: x)
         RunningAverage(output_transform=lambda x: x["loss"]).attach(self.ignite_trainer, "loss_avg")
-        ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(self.ignite_evaluator)
+        ProgressBar(bar_format=None).attach(self.ignite_evaluator)
 
 
     def train_step(self, engine: Engine, batch: Tuple) -> Dict[str, Tensor]:
         self.model.train()
-        with torch.enable_grad(), self.accelerator.accumulate(self.model):
+        with torch.enable_grad():
             self.optimizer.zero_grad()
-            loss = self.model(*prepare_wds_batch_default(batch,self.accelerator.device), return_loss=True)
-            self.accelerator.backward(loss)
+            loss = self.model(*prepare_wds_batch_default(batch,self.device), return_loss=True)
+            loss.backward()
             self.optimizer.step()
             return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 
-    def run_inference(self, dl_eval):
+    def run_inference(self, dl_eval: Iterable):
         local_evaluator = self.ignite_evaluator
-        EpochOutputStore().attach(local_evaluator, 'output')
-        self.ignite_evaluator.run(dl_eval)
-        pred, tar = list(zip(*local_evaluator.state.output))
-        return torch.cat(pred, dim=0), torch.cat(tar, dim=0)
+        eval_metric = self._metric_obj.metric()
+        eval_metric.attach(local_evaluator, self.metric)
+        local_evaluator.run(dl_eval)
+        return local_evaluator.state.metrics
 
     def run(self, dl_train, dl_dev):
-        self.model, self.optimizer, dl_train, dl_dev = self.accelerator.prepare(
-            self.model, self.optimizer, dl_train, dl_dev
-        )
-
-        metrics = {"loss": Loss(self.accelerator.unwrap_model(self.model).criterion), self.metric: MetricType[self.metric]()}
+        metrics = {'loss':Loss(self.model.criterion), self.metric : self._metric_obj.metric()}
         for name, metric in metrics.items():
             metric.attach(self.ignite_evaluator, name)
 
@@ -130,9 +121,7 @@ class Trainer:
                 f"Epoch: {trainer.state.epoch} {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
             )
 
-        from ignite.handlers import ModelCheckpoint
-
-
+        from ignite.handlers import ModelCheckpoint, Checkpoint
         checkpoint_handler = ModelCheckpoint(
             dirname=self.ckpt_dir,
             filename_pattern=self.ckpt_name,
@@ -140,6 +129,7 @@ class Trainer:
             create_dir=True,
             require_empty=False,
             score_name=self.metric,
+            score_function=Checkpoint.get_default_score_fn(self.metric, self._metric_obj.score),
             global_step_transform=global_step_from_engine(self.ignite_trainer)
         )
         with self.ignite_evaluator.add_event_handler(Events.EPOCH_COMPLETED,
