@@ -47,7 +47,8 @@ class VoxLingua33Task(TaskBase):
             valid_split="dev",
             zenodo_id="TODO",
             output_dim=len(self.class_label_maps),
-            epochs=50,
+            epochs=10,
+            crop_length=10, # 10s
         )
         super().__init__(encoder, config=task_config)
         self.label_processor = lambda x: self.class_label_maps[x[data_key]]

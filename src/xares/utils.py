@@ -4,8 +4,8 @@ from pathlib import Path
 from loguru import logger
 
 
-def mkdir_if_not_exists(dir):
-    if not os.path.exists(dir):
+def mkdir_if_not_exists(dir, main_process: bool = True):
+    if not os.path.exists(dir) and main_process:
         logger.info(f"Creating directory {dir}...")
         os.makedirs(dir)
 

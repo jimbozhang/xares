@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import io
 import logging
+import json
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal
+from accelerate import Accelerator
 
 import ignite.metrics
 import numpy as np
@@ -14,10 +17,11 @@ import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
 
-from xares.audiowebdataset import batched, create_embedding_webdataset, create_rawaudio_webdataset
+import webdataset as wds
+from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.models import Mlp
-from xares.trainer import MetricType, Trainer, inference
+from xares.trainer import MetricType, Trainer
 from xares.utils import download_zenodo_record, mkdir_if_not_exists
 
 
@@ -26,7 +30,7 @@ class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
     env_root: Path | str | None = None
     # General
-    torch_num_threads: int = 1  # Do not use too many otherwise slows down
+    torch_num_threads: int = 2  # Do not use too many otherwise slows down
     seed: int = 42  # manual seed for all experiments
     label_processor: Callable = field(default=lambda x: x)
 
@@ -48,9 +52,10 @@ class TaskConfig:
     encoder: Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
-    save_encoded_per_batches: int = 1000
-    batch_size_encode: int = 16
+    save_encoded_per_batches: int = 2000
+    batch_size_encode: int = 64
     num_encoder_workers: int = 4
+    crop_length: None | float = None
 
     # MLP
     force_retrain_mlp: bool = False
@@ -71,6 +76,9 @@ class TaskConfig:
         self.update_tar_name_of_split()
         if self.env_root is None:
             self.env_root = self.xares_settings.env_root
+        torch.set_num_threads(self.torch_num_threads)
+        torch.manual_seed(self.seed)
+        np.random.seed(self.seed)
 
     def update_tar_name_of_split(self):
         if self.k_fold_splits is not None:
@@ -90,23 +98,32 @@ class TaskConfig:
 
 
 class TaskBase(ABC):
-    def __init__(self, encoder: Any, config: None | TaskConfig = None):
+    def __init__(self, encoder: Callable, config: None | TaskConfig = None):
         logging.captureWarnings(True)
         logging.getLogger("py.warnings").setLevel(logging.ERROR)
+        self.accelerator = Accelerator()
+        # Make the logger with this format the default for all loggers in this package
+        logger.configure(
+            handlers=[
+                {
+                    "sink": sys.stdout,
+                    "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
+                    "level": "DEBUG",
+                    "filter": lambda _: self.accelerator.is_main_process
+                }
+            ]
+        )
 
-        self.config = config or TaskConfig()
+        self.config = config or TaskConfig(encoder=self.encoder)
         self.encoder = encoder
-        self.mlp = None
-        torch.set_num_threads(self.config.torch_num_threads)
-        torch.manual_seed(self.config.seed)
-        np.random.seed(self.config.seed)
+        self.trainer = None
 
         self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().replace("task", "")
         self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
-        mkdir_if_not_exists(self.encoded_tar_dir)
+        mkdir_if_not_exists(self.encoded_tar_dir, main_process=self.accelerator.is_main_process)
 
         if self.config.k_fold_splits:
             self.config.train_split = self.config.valid_split = self.config.test_split = None
@@ -128,17 +145,15 @@ class TaskBase(ABC):
             [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
             [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
         )
-        acc = self.evaluate_mlp(
+        score = self.evaluate_mlp(
             [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
             metric=self.config.metric,
             load_ckpt=True,
         )
-        logger.info(f"The accuracy: {acc}")
-
-        score = acc
+        logger.info(f"Score: {score}")
         return score
 
-    def default_run_k_fold(self) -> float:
+    def default_run_k_fold(self) -> float | np.floating | np.ndarray | torch.Tensor:
         self.make_encoded_tar()
 
         acc = []
@@ -169,6 +184,8 @@ class TaskBase(ABC):
         return avg_score
 
     def default_make_encoded_tar(self):
+        accelerator = self.accelerator
+        self.encoder = accelerator.prepare(self.encoder)
         self.encoded_tar_path_of_split = {
             split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
             for split in self.config.encoded_tar_name_of_split
@@ -180,7 +197,7 @@ class TaskBase(ABC):
             return
 
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
-        if not audio_ready_path.exists():
+        if not audio_ready_path.exists() and accelerator.main_process_first:
             download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
             audio_ready_path.touch()
 
@@ -189,7 +206,6 @@ class TaskBase(ABC):
             for split in self.config.audio_tar_name_of_split
         }
 
-        import webdataset as wds
 
         for split in audio_tar_path_of_split:
             logger.info(f"Encoding audio for split {split} ...")
@@ -197,46 +213,51 @@ class TaskBase(ABC):
             dl = create_rawaudio_webdataset(
                 [audio_tar_path_of_split[split]],
                 target_sample_rate=self.encoder.required_sampling_rate,
-                audio_key_name="audio",
                 num_workers=self.config.num_encoder_workers,
+                batch_size=self.config.batch_size_encode,
+                crop_length=self.config.crop_length,
+                pad_last=True, # Add crop
             )
             sink = wds.ShardWriter(
-                self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0%05d"),
+                self.encoded_tar_path_of_split[split].as_posix().replace("*", f"{accelerator.process_index}0%05d"),
                 encoder=False,
                 compress=False,
                 maxcount=self.config.save_encoded_per_batches,
                 verbose=False,
             )
 
-            with torch.inference_mode():
-                for sample in tqdm(dl, desc=f"Encoding {split}", leave=True):
-                    audio, audio_sr = sample.pop("audio")
+            with torch.inference_mode(), accelerator.autocast():
+                for enum_item,((audio, audio_length), json_data, filenames) in tqdm(enumerate(dl), desc=f"Encoding {split}", leave=True, disable=not accelerator.is_main_process):
                     audio = audio.to(self.encoder.device)
-                    embedding = self.encoder(audio).to("cpu").squeeze(0).detach()
-                    buf = io.BytesIO()
-                    torch.save(embedding, buf)
-                    sink.write({"pth": buf.getvalue(), **sample})
+                    embedding = self.encoder(audio).to("cpu").detach()
+                    for embed, json_data_sample, filename in zip(embedding, json_data, filenames):
+                        buf = io.BytesIO()
+                        np.save(buf,embed.numpy())
+                        sink.write({"npy": buf.getvalue(), 'json': json.dumps(json_data_sample).encode('utf-8'), '__key__': f"{filename}{enum_item}"})
 
-        encoded_ready_path.touch()
+        if accelerator.is_main_process:
+            encoded_ready_path.touch()
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
-        self.mlp = Mlp(
+        mlp = Mlp(
             in_features=self.encoder.output_dim, out_features=self.config.output_dim, criterion=self.config.criterion
-        ).to(self.encoder.device)
+        )
 
-        if not self.config.force_retrain_mlp and self.ckpt_path.exists():
-            logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
-            self.mlp.load_state_dict(torch.load(self.ckpt_path))
-            return
-
-        trainer = Trainer(
-            self.mlp,
+        self.trainer = Trainer(
+            mlp,
+            accelerator=self.accelerator,
             ckpt_dir=self.ckpt_dir,
             ckpt_name=self.config.ckpt_name,
             metric=self.config.metric,
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
         )
+
+        if not self.config.force_retrain_mlp and self.ckpt_path.exists():
+            logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
+            self.trainer.load_state_dict(torch.load(self.ckpt_path))
+            return
+
 
         dl_train = create_embedding_webdataset(
             train_url,
@@ -254,15 +275,15 @@ class TaskBase(ABC):
             label_processor=self.label_processor,
         )
 
-        trainer.run(dl_train, dl_val)
+        self.trainer.run(dl_train, dl_val)
 
     def evaluate_mlp(self, eval_url: list, metric: str = "Accuracy", load_ckpt: bool = False) -> float:
-        if self.mlp is None:
+        if self.trainer is None:
             raise ValueError("Train the model first before evaluation.")
 
         if load_ckpt:
             if self.ckpt_path.exists():
-                self.mlp.load_state_dict(torch.load(self.ckpt_path))
+                self.trainer.load_state_dict(torch.load(self.ckpt_path))
                 logger.info(f"Loaded model parameters from {self.ckpt_path}")
             else:
                 logger.warning(f"No checkpoint found at {self.ckpt_path}. Skip loading.")
@@ -273,7 +294,7 @@ class TaskBase(ABC):
             num_workers=self.config.num_validation_workers,
             label_processor=self.label_processor,
         )
-        preds, labels = inference(self.mlp, dl)
+        preds, labels = self.trainer.run_inference(dl)
 
         metric_func = MetricType[metric].__name__
         try:

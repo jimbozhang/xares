@@ -3,8 +3,6 @@
 import json
 import warnings
 from functools import partial
-from io import BytesIO
-from itertools import islice
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union  # type: ignore
 
@@ -19,7 +17,6 @@ def fast_warn_and_continue(exn):
     warnings.warn(repr(exn))
     return True
 
-
 def crop_or_pad_audio(wav: torch.Tensor, crop_size: int, pad_last: bool = False):
     n_samples, *_ = wav.shape
     available_crops = n_samples // crop_size
@@ -27,7 +24,7 @@ def crop_or_pad_audio(wav: torch.Tensor, crop_size: int, pad_last: bool = False)
         crop = wav[i * crop_size : (i + 1) * crop_size, ...]
         yield crop
 
-    if (available_crops == 0) or (pad_last):
+    if (available_crops == 0) and pad_last:
         last_crop = wav[available_crops * crop_size :, ...]
         padded = torch.zeros((crop_size, *last_crop.shape[1:]))
         padded[: last_crop.shape[0]] = last_crop
@@ -36,9 +33,10 @@ def crop_or_pad_audio(wav: torch.Tensor, crop_size: int, pad_last: bool = False)
 
 def _seq_crop_audio(
     data,
-    crop_size: None | int,
+    crop_length: None | float,
     mono: bool = True,
     drop_clipped: bool = True,
+    pad_last: bool = False,
     handler=None,
 ):
     """WebDataset crop filter, yields sequential crops"""
@@ -49,14 +47,13 @@ def _seq_crop_audio(
             audio = audio.mean(0)
         if audio.abs().max() >= 0.99 and drop_clipped:
             continue
-        if crop_size is not None:
-            crops = crop_or_pad_audio(audio.float(), crop_size=(crop_size * sr), pad_last=False)
+        if crop_length is not None:
+            crops = crop_or_pad_audio(audio.float(), crop_size=(crop_length * sr), pad_last=pad_last)
         else:
             crops = [audio.float()]
 
         for crop in crops:
             yield (crop, *extra)
-
 
 class Audiowebdataset(wds.DataPipeline):
 
@@ -126,6 +123,7 @@ class Audiowebdataset(wds.DataPipeline):
             ]
         )
 
+
         if merge_function is not None:
             pipeline.extend([merge_function])
 
@@ -138,6 +136,7 @@ class Audiowebdataset(wds.DataPipeline):
                     ),
                 )
             )
+
         super().__init__(pipeline)
 
 
@@ -212,46 +211,32 @@ def collate_with_lengths_wds(
     return result
 
 
-def batched(iterable: Iterable, n: int) -> Iterable:
-    # batched('ABCDEFG', 3) → ABC DEF G
-    iterator = iter(iterable)
-    while batch := tuple(islice(iterator, n)):
-        yield batch
-
-
 # Returns (single) dicts with (audio=audio_data, *extra ), useful for only reading audio and keeping other items the same
 def create_rawaudio_webdataset(
     urls: Union[List[str], Dict[str, List[str]]],
     target_sample_rate: Optional[int] = None,
-    audio_key_name: Literal["audio"] = "audio",  # Just for confirmation that the return dict contains this key
     mono: bool = True,
     num_workers: int = 4,
+    batch_size:int = 64,
+    crop_length: float | None = None,
+    pad_last: bool = False, # If only 1 crop available, use padding 
     **kwargs,
 ):
-    def decode_resample_audio(audio_stream: bytes) -> Tuple[torch.Tensor, int]:
-        wav_file_bytesIO = BytesIO(audio_stream)
-        audio_sr = torchaudio.load(wav_file_bytesIO)
-        audio, sr = audio_sr
-        if mono and audio.ndim == 2:
-            audio = audio.mean(0)
-            audio_sr = (audio, sr)
-        if target_sample_rate is None:
-            return audio_sr
-        audio = torchaudio.functional.resample(audio, sr, target_sample_rate)
-        return (audio, target_sample_rate)
 
-    urls = expand_with_brace(urls)
-
-    dataset = wds.DataPipeline(
-        wds.SimpleShardList(urls),
-        wds.split_by_node,
-        wds.split_by_worker,
-        wds.tarfile_to_samples(),
-        wds.rename(**{audio_key_name: "flac;mp3;sox;wav;m4a;ogg;wma"}),
-        wds.map_dict(**{audio_key_name: decode_resample_audio}, handler=fast_warn_and_continue),
+    dataset_kwargs = dict(
+        batch_size=batch_size,
+        rename_keys=(dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", json="json", filename="__key__")),
+        target_sample_rate = target_sample_rate,
+        merge_function = partial(_seq_crop_audio, crop_length = crop_length , mono=mono, drop_clipped=False, pad_last= pad_last),
     )
+    urls = expand_with_brace(urls)
+    dataset = Audiowebdataset(urls, **dataset_kwargs)
     # Set num_workers at most to number of tars, otherwise some processes will do nothing, slowing down dataloading
-    dataloader = wds.WebLoader(dataset, num_workers=min(len(urls), num_workers), batch_size=None)
+    dataloader = wds.WebLoader(dataset, num_workers=min(len(urls), num_workers), batch_size=None).unbatched()
+    dataloader = dataloader.batched(
+        batch_size,
+        collation_fn=partial(collate_with_lengths_wds, flatten=False),
+    )
     return dataloader
 
 
@@ -269,9 +254,9 @@ def create_embedding_webdataset(
     dataset_kwargs = dict(
         tar_shuffle=tar_shuffle,
         batch_size=batch_size,
-        rename_keys=(dict(embedding="pth", json="json", filename="__key__")),
+        rename_keys=dict(embedding="npy", target="json", filename="__key__"),
         map_kwargs=dict(
-            embedding=lambda x: x.transpose(-2, -1), json=label_processor if label_processor else lambda x: x
+            embedding=lambda x: x.transpose(), target=label_processor if label_processor else lambda x: x,
         ),  # Transpose (B,T,D) -> (B,D,T), map the labels if provided
     )
     if balanced_sampler:
@@ -286,8 +271,6 @@ def create_embedding_webdataset(
         dataset,
         batch_size=None,
         num_workers=num_workers,
-        persistent_workers=num_workers > 1,
-        pin_memory=True,
     ).unbatched()
     if training:
         dataloader = dataloader.shuffle(512)

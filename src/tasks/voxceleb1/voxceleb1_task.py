@@ -1266,6 +1266,7 @@ class VoxCeleb1Task(TaskBase):
             zenodo_id="TODO",
             output_dim=len(self.class_label_maps),
             epochs=50,
+            crop_length=6, # 6s 
         )
         super().__init__(encoder, config=task_config)
         self.label_processor = lambda x: self.class_label_maps[x[data_key]]

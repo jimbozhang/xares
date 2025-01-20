@@ -14,7 +14,7 @@ class ASVSpoof2015Task(TaskBase):
             zenodo_id="TODO",
             output_dim=len(self.class_label_maps),
             label_processor=lambda x: self.class_label_maps[x[data_key]],
-            epochs=50,
+            batch_size_encode=1,
         )
         super().__init__(encoder, config=task_config)
 
