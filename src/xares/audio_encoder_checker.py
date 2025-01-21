@@ -1,10 +1,8 @@
-from typing import Any
-
 import torch
 from loguru import logger
 
 
-def check_audio_encoder(encoder: Any):
+def check_audio_encoder(encoder: torch.nn.Module):
     if not isinstance(encoder, torch.nn.Module):
         logger.error(f"Expected torch.nn.Module for encoder, got {type(encoder)}")
         return False
