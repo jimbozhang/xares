@@ -213,7 +213,7 @@ def collate_with_lengths_wds(
 
 # Returns (single) dicts with (audio=audio_data, *extra ), useful for only reading audio and keeping other items the same
 def create_rawaudio_webdataset(
-    urls: Union[List[str], Dict[str, List[str]]],
+    urls: List[str] |  Dict[str, List[str]],
     target_sample_rate: Optional[int] = None,
     mono: bool = True,
     num_workers: int = 4,
@@ -248,6 +248,7 @@ def create_embedding_webdataset(
     num_workers: int = 4,
     training: bool = False,
     label_processor: None | Callable = None,
+    merge_processor: None | Callable = None,
     **kwargs,
 ):
 
@@ -258,6 +259,7 @@ def create_embedding_webdataset(
         map_kwargs=dict(
             embedding=lambda x: x.transpose(), target=label_processor if label_processor else lambda x: x,
         ),  # Transpose (B,T,D) -> (B,D,T), map the labels if provided
+        merge_function = merge_processor,
     )
     if balanced_sampler:
         assert isinstance(urls, dict)
