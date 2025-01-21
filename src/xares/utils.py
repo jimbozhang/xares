@@ -4,10 +4,10 @@ from pathlib import Path
 from loguru import logger
 
 
-def mkdir_if_not_exists(dir, main_process: bool = True):
-    if not os.path.exists(dir) and main_process:
+def mkdir_if_not_exists(dir:Path, main_process: bool = True):
+    if not dir.exists() and main_process:
         logger.info(f"Creating directory {dir}...")
-        os.makedirs(dir)
+        dir.mkdir(parents=True, exist_ok=True)
 
 
 def download_file(url, filename, force=False):
