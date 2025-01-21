@@ -5,7 +5,7 @@ from dasheng import dasheng_base
 class DashengEncoder(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.simple_rate = 16000
+        self.sampling_rate = 16000
         self.output_dim = 768
         self.model = dasheng_base()
 

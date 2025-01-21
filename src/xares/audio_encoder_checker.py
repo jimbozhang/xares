@@ -13,6 +13,10 @@ def check_audio_encoder(encoder: Any):
         logger.error("Encoder must have a 'output_dim' attribute")
         return False
 
+    if not hasattr(encoder, "sampling_rate"):
+        logger.error("Encoder must have a 'sampling_rate' attribute")
+        return False
+
     sample_audio = torch.randn(2, 50000)
     try:
         encoded_audio = encoder(sample_audio)
