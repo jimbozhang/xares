@@ -49,6 +49,7 @@ def masked_mean(x, x_length, dim: int = -1):
 def cast_to_tensor(y: Iterable):
     return torch.tensor(y) if not isinstance(y, torch.Tensor) else y
 
+
 @dataclass
 class Trainer:
     model: nn.Module
