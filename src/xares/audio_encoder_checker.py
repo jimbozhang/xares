@@ -3,6 +3,10 @@ from loguru import logger
 
 
 def check_audio_encoder(encoder: torch.nn.Module):
+    if not type(encoder).__name__.endswith("Encoder"):
+        logger.error("Class name must end with 'Encoder'")
+        return False
+
     if not isinstance(encoder, torch.nn.Module):
         logger.error(f"Expected torch.nn.Module for encoder, got {type(encoder)}")
         return False

@@ -46,3 +46,20 @@ def download_zenodo_record(zenodo_id: str, target_dir: str, force_download=False
         download_file(zenodo_archive, target_path, force=force_download)
 
     unzip_file(f"{target_dir}/{zenodo_id}.zip", target_dir)
+
+
+def py_path_to_class(path: str, endswith: str | None = None) -> type:
+    from importlib import import_module
+
+    module_name = path.replace("/", ".").strip(".py")
+
+    try:
+        module = import_module(module_name)
+    except ModuleNotFoundError:
+        raise ValueError(f"Module not found: {module_name}")
+
+    classes = [cls for cls in dir(module) if not endswith or cls.endswith(endswith)]
+    if len(classes) != 1:
+        raise ValueError(f"Expected 1 class with endswith={endswith}, got {len(classes)}")
+
+    return getattr(module, classes[0])
