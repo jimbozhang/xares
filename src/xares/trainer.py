@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Iterable, Tuple
 
 import torch
@@ -71,6 +71,7 @@ class Trainer:
         except AttributeError:
             raise NotImplementedError(f"Optimizer {self.optimizer} not implemented.")
 
+        self.model.to(self.accelerator.device)
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(self.validation_step)
         ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(
@@ -151,6 +152,7 @@ def inference(model, dl_eval):
         model.eval()
         for batch in tqdm(dl_eval, desc="Evaluating"):
             x, y = Trainer.decode_wds_batch(batch)
+            model.to(x.device)
             y_pred, y = model(x, y, return_loss=False)
             all_preds.append(y_pred)
             all_targets.append(y)

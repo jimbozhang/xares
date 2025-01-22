@@ -3,7 +3,6 @@ import torch.nn as nn
 
 
 class Mlp(nn.Module):
-
     def __init__(self, in_features, out_features: int | None = None, criterion="CrossEntropyLoss"):
         super().__init__()
         out_features = out_features or in_features

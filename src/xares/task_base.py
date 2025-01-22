@@ -14,7 +14,7 @@ import torch.nn as nn
 from loguru import logger
 from tqdm import tqdm
 
-from xares.audiowebdataset import batched, create_embedding_webdataset, create_rawaudio_webdataset
+from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.models import Mlp
 from xares.trainer import MetricType, Trainer, inference
@@ -95,8 +95,10 @@ class TaskBase(ABC):
         logging.getLogger("py.warnings").setLevel(logging.ERROR)
 
         self.config = config or TaskConfig()
-        self.encoder = encoder
+        self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.encoder = encoder.to(self.encoder_device)
         self.mlp = None
+
         torch.set_num_threads(self.config.torch_num_threads)
         torch.manual_seed(self.config.seed)
         np.random.seed(self.config.seed)
@@ -196,7 +198,7 @@ class TaskBase(ABC):
             logger.debug(f"Using data from {audio_tar_path_of_split[split]} ... ")
             dl = create_rawaudio_webdataset(
                 [audio_tar_path_of_split[split]],
-                target_sample_rate=self.encoder.required_sampling_rate,
+                target_sample_rate=self.encoder.sampling_rate,
                 audio_key_name="audio",
                 num_workers=self.config.num_encoder_workers,
             )
@@ -211,7 +213,7 @@ class TaskBase(ABC):
             with torch.inference_mode():
                 for sample in tqdm(dl, desc=f"Encoding {split}", leave=True):
                     audio, audio_sr = sample.pop("audio")
-                    audio = audio.to(self.encoder.device)
+                    audio = audio.to(self.encoder_device)
                     embedding = self.encoder(audio).to("cpu").squeeze(0).detach()
                     buf = io.BytesIO()
                     torch.save(embedding, buf)
@@ -222,7 +224,7 @@ class TaskBase(ABC):
     def train_mlp(self, train_url: list, validation_url: list) -> None:
         self.mlp = Mlp(
             in_features=self.encoder.output_dim, out_features=self.config.output_dim, criterion=self.config.criterion
-        ).to(self.encoder.device)
+        )
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")

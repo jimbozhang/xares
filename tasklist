@@ -1,0 +1,14 @@
+src.tasks.esc50.esc50_task
+src.tasks.crema_d.crema_d_task
+src.tasks.librispeech_clean_100.librispeech_male_female_task
+src.tasks.vocalsound.vocalsound_task
+src.tasks.asvspoof2015.asvspoof_task
+src.tasks.fluentspeechcommands.fluentspeechcommands_kws_task
+src.tasks.gtzan.gtzan_task
+src.tasks.libricount.libricount_task
+src.tasks.liveenv.liveenv_task
+src.tasks.ravdess.ravdess_task
+src.tasks.speechcommands.speechcommandsv1_task
+src.tasks.urbansound8k.urbansound8k_task
+src.tasks.voxceleb1.voxceleb1_task
+src.tasks.voxlingua.voxlingua33_task

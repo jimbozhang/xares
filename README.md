@@ -2,54 +2,42 @@
 
 X-ARES: eXtensive Audio Representation and Evaluation Suite
 
-**This project is still in the early stage of development and welcomes contributions, especially in expanding supported tasks and improving robustness.**
-
 ## Introduction
 
 X-ARES is a toolkit for training, evaluating, and exporting audio encoders for various audio tasks. It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/).
 
-## Planned supported tasks
-
-Currently, only four tasks (ESC-50, VocalSound, CREMA-D and LibriSpeech-Male-Female) have been implemented. However, adding new tasks is straightforward: it typically only need to implement the audio data download and packaging functions, as manual audio decoding and training implementations are not necessary. We encourage anyone to submit pull requests to expand the set of supported tasks.
+## Supported tasks
 
 ### Speech
 
-- Speech Commands V1
-- Speech Commands V2
-- LibriCount
-- VoxLingua107
-- VoxCeleb1
-- LibriSpeech-Male-Female
-- LibriSpeech-Phoneme
-- Fluent Speech Commands
-- VocalSound
-- CREMA-D
-- RAVDESS
-- ASV2015
-- DiCOVA
-- speechocean762
+- [x] Speech Commands V2
+- [x] LibriCount
+- [x] VoxLingua107
+- [x] VoxCeleb1
+- [x] LibriSpeech-Male-Female
+- [x] Fluent Speech Commands
+- [x] VocalSound
+- [x] CREMA-D
+- [x] RAVDESS
+- [ ] LibriSpeech-Phoneme
+- [ ] speechocean762
+- [x] ASV2015
 
 ### Environment
 
-- ESC-50
-- FSD50k
-- UrbanSound 8k
-- DESED
-- (A task designed for car)
-- (Another task designed for car)
-- (A task designed for soundbox)
-- (A task designed for headphone)
-- LITIS Rouen
-- FSD18-Kaggle
-- AudioCaps
+- [x] ESC-50
+- [ ] FSD50k
+- [x] UrbanSound 8k
+- [ ] DESED
+- [ ] FSD18-Kaggle
+- [x] Clotho
 
 ### Music
 
-- MAESTRO
-- GTZAN Genre
-- NSynth
-- MTG-Jamendo
-- FMA
+- [ ] MAESTRO
+- [x] GTZAN Genre
+- [ ] NSynth
+- [ ] FMA
 
 ## Installation
 
@@ -80,6 +68,31 @@ task = ESC50Task(encoder=DashengEncoder())
 score = task.run()
 ```
 
+## Run all tasks parallelly
+
+You can run all tasks parallelly with the following command:
+
+```bash
+python run.py [-h] [--max-jobs MAX_JOBS] [--task-list TASK_LIST] encoder_module encoder_class
+```
+
+The command line arguments are as follows:
+
+```plaintext
+Run tasks with a maximum concurrency limit.
+
+positional arguments:
+  encoder_module        Encoder module. eg: example.dasheng.dasheng_encoder
+  encoder_class         Encoder classname. eg: DashengEncoder
+
+options:
+  -h, --help            show this help message and exit
+  --max-jobs MAX_JOBS   Maximum number of concurrent tasks.
+  --task-list TASK_LIST File containing a list of task modules to execute.
+```
+
+There is an example task list file at `tasklist`.
+
 ## Run with your own pretrained audio encoder
 
 An example of audio encoder wrapper could be found at `example/dasheng/dasheng_encoder.py` and `example/wav2vec2/wav2vec2.py`.
@@ -88,6 +101,7 @@ We provide a check function to verify if the encoder is correctly implemented:
 
 ```python
 >>> from xares.audio_encoder_checker import check_audio_encoder
+
 >>> encoder = DashengEncoder()
 >>> check_audio_encoder(encoder)
 True

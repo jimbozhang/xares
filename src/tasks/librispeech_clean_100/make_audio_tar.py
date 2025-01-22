@@ -11,7 +11,7 @@ from xares.utils import download_file, mkdir_if_not_exists, untar_file
 
 def make_audio_tar(env_root: None | str = None, force_download=False, force_generate_audio_tar=True, num_shards=4):
     settings = XaresSettings()
-    target_dir = Path(env_root) if env_root else Path(settings.env_root) / "librispeech_clean_100"
+    target_dir = Path(env_root) if env_root else Path(settings.env_root) / "librispeechmalefemale"
     audio_tar_ready_file_path = target_dir / settings.audio_ready_filename
 
     if not force_generate_audio_tar and audio_tar_ready_file_path.exists():
