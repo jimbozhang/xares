@@ -153,7 +153,7 @@ class TaskBase(ABC):
             [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
             [self.encoded_tar_path_of_split[self.config.test_split].as_posix()]
         )
-        logger.info(f"MLP Score: {mlp_score:.2%} KNNScore :{knn_score:.2%}")
+        logger.info(f"MLP Score: {mlp_score:.2%} KNNScore: {knn_score:.2%}")
         return mlp_score
 
     def default_run_k_fold(self) -> float | np.floating | np.ndarray | torch.Tensor:

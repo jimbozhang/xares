@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from dataclasses import dataclass
 from typing import Dict, List, Literal, Callable
-from ignite.metrics import Accuracy, MeanSquaredError, MeanAbsoluteError, AveragePrecision, Metric
+from ignite.metrics import Accuracy, EpochMetric, MeanSquaredError, MeanAbsoluteError, AveragePrecision, Metric
 
 METRICS_TYPE = Literal["accuracy","EER","mAP","recallatk","MAE", "MSE"]
 
@@ -50,13 +50,25 @@ class CLAPScore(Metric):
                           select=self.select)
 
 
+def compute_eer(pred, target, positive_label:int=1):
+    from sklearn.metrics import roc_curve
+    fpr, tpr, _ = roc_curve(target, pred, positive_label)
+    fnr = 1 - tpr
+    eer_1 = fpr[np.nanargmin(np.absolute((fnr - fpr)))]
+    eer_2 = fnr[np.nanargmin(np.absolute((fnr - fpr)))]
+    eer = (eer_1 + eer_2) / 2
+    return eer
+
+
+EERMetric = lambda : EpochMetric(compute_fn = compute_eer)
+
 ALL_METRICS:Dict[METRICS_TYPE, EvalMetric] = dict(
         accuracy = EvalMetric(Accuracy, score = 1.),
         mAP = EvalMetric(AveragePrecision, score=1.),
         MAE = EvalMetric(MeanAbsoluteError, score=-1.),
         MSE = EvalMetric(MeanSquaredError, score=-1.),
         recallatk = EvalMetric(CLAPScore, score=1.),
-        EER = EvalMetric(lambda x:x , score=-1.),
+        EER = EvalMetric(EERMetric, score=-1.),
         )
 
 def cos_sim(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
