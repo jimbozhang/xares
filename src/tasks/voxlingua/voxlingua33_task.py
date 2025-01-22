@@ -40,6 +40,7 @@ class VoxLingua33Task(TaskBase):
             "sr": 32,
         }
         task_config = TaskConfig(
+            encoder=encoder,
             batch_size_train=64,
             learning_rate=1e-3,
             train_split="train_subset",
@@ -49,9 +50,9 @@ class VoxLingua33Task(TaskBase):
             output_dim=len(self.class_label_maps),
             epochs=10,
             crop_length=10, # 10s
+            label_processor = lambda x: self.class_label_maps[x[data_key]]
         )
         super().__init__(encoder, config=task_config)
-        self.label_processor = lambda x: self.class_label_maps[x[data_key]]
 
     def run(self) -> float:
         return self.default_run()

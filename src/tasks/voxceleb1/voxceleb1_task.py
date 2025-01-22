@@ -1271,7 +1271,7 @@ class VoxCeleb1Task(TaskBase):
         super().__init__(encoder, config=task_config)
         self.label_processor = lambda x: self.class_label_maps[x[data_key]]
 
-    def run(self) -> float:
+    def run(self):
         return self.default_run()
 
     def make_encoded_tar(self):

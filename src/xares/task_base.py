@@ -103,7 +103,6 @@ class TaskBase(ABC):
     def __init__(self, encoder: Callable, config: None | TaskConfig = None):
         logging.captureWarnings(True)
         logging.getLogger("py.warnings").setLevel(logging.ERROR)
-        self.accelerator = Accelerator()
         # Make the logger with this format the default for all loggers in this package
         logger.configure(
             handlers=[
@@ -111,7 +110,6 @@ class TaskBase(ABC):
                     "sink": sys.stdout,
                     "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
                     "level": "DEBUG",
-                    "filter": lambda _: self.accelerator.is_main_process
                 }
             ]
         )
@@ -125,7 +123,7 @@ class TaskBase(ABC):
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
-        mkdir_if_not_exists(self.encoded_tar_dir, main_process=self.accelerator.is_main_process)
+        mkdir_if_not_exists(self.encoded_tar_dir)
 
         if self.config.k_fold_splits:
             self.config.train_split = self.config.valid_split = self.config.test_split = None
@@ -184,7 +182,7 @@ class TaskBase(ABC):
         return avg_score
 
     def default_make_encoded_tar(self):
-        accelerator = self.accelerator
+        accelerator = Accelerator()
         self.encoder = accelerator.prepare(self.encoder)
         self.encoded_tar_path_of_split = {
             split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
@@ -228,7 +226,7 @@ class TaskBase(ABC):
 
             with torch.inference_mode(), accelerator.autocast():
                 for enum_item,((audio, audio_length), json_data, filenames) in tqdm(enumerate(dl), desc=f"Encoding {split}", leave=True, disable=not accelerator.is_main_process):
-                    audio = audio.to(self.encoder.device)
+                    audio = audio.to(accelerator.device)
                     embedding = self.encoder(audio).to("cpu").detach()
                     for embed, json_data_sample, filename in zip(embedding, json_data, filenames):
                         buf = io.BytesIO()
