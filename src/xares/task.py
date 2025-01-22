@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import logging
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal
@@ -25,6 +24,7 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
     env_root: Path | str | None = None
+    name: str = "default_task"
 
     # General
     private: bool = False
@@ -46,13 +46,13 @@ class TaskConfig:
     zenodo_id: str | None = None
 
     # Encoded tar
-    force_encoded: bool = False
+    force_encode: bool = False
     encoder: Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
     save_encoded_per_batches: int = 1000
     batch_size_encode: int = 16
-    num_encoder_workers: int = 4
+    num_encoder_workers: int = 0
 
     # MLP
     force_retrain_mlp: bool = False
@@ -63,16 +63,19 @@ class TaskConfig:
     batch_size_train: int = 32
     learning_rate: float = 3e-3
     epochs: int = 10
-    num_training_workers: int = 4
-    num_validation_workers: int = 4
+    num_training_workers: int = 0
+    num_validation_workers: int = 0
     model: nn.Module | None = None
     output_dim: int | None = None
     metric: Literal["accuracy"] = "accuracy"
 
-    def __post_init__(self):
+    def __post_init__(self, **kwargs):
         self.update_tar_name_of_split()
         if self.env_root is None:
             self.env_root = self.xares_settings.env_root
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def update_tar_name_of_split(self):
         if self.k_fold_splits is not None:
@@ -91,8 +94,8 @@ class TaskConfig:
             }
 
 
-class TaskBase(ABC):
-    def __init__(self, encoder: Any, config: None | TaskConfig = None):
+class XaresTask:
+    def __init__(self, encoder: nn.Module, config: None | TaskConfig = None):
         logging.captureWarnings(True)
         logging.getLogger("py.warnings").setLevel(logging.ERROR)
 
@@ -105,7 +108,7 @@ class TaskBase(ABC):
         torch.manual_seed(self.config.seed)
         np.random.seed(self.config.seed)
 
-        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().replace("task", "")
+        self.env_dir = Path(self.config.env_root) / self.config.name
         self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
@@ -117,69 +120,14 @@ class TaskBase(ABC):
 
         self.label_processor = self.config.label_processor
 
-    @abstractmethod
-    def run(self) -> float:
-        pass
-
-    @abstractmethod
     def make_encoded_tar(self):
-        pass
-
-    def default_run(self) -> float:
-        self.make_encoded_tar()
-
-        self.train_mlp(
-            [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
-            [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
-        )
-        acc = self.evaluate_mlp(
-            [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
-            metric=self.config.metric,
-            load_ckpt=True,
-        )
-        logger.info(f"The accuracy: {acc}")
-
-        score = acc
-        return score
-
-    def default_run_k_fold(self) -> float:
-        self.make_encoded_tar()
-
-        acc = []
-        splits = self._make_splits()
-        wds_encoded_training_fold_k = {
-            k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
-        }
-
-        for k in splits:
-            self.config.ckpt_name = f"fold_{k}_best_model.pt"
-            self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
-            self.train_mlp(
-                wds_encoded_training_fold_k[k],
-                [self.encoded_tar_path_of_split[k].as_posix()],
-            )
-            acc.append(
-                self.evaluate_mlp(
-                    [self.encoded_tar_path_of_split[k].as_posix()], metric=self.config.metric, load_ckpt=True
-                )
-            )
-
-        for k in range(len(splits)):
-            logger.info(f"Fold {k+1} accuracy: {acc[k]}")
-
-        avg_score = np.mean(acc)
-        logger.info(f"The averaged accuracy of 5 folds is: {avg_score}")
-
-        return avg_score
-
-    def default_make_encoded_tar(self):
         self.encoded_tar_path_of_split = {
             split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
             for split in self.config.encoded_tar_name_of_split
         }
 
         encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
-        if not self.config.force_encoded and encoded_ready_path.exists():
+        if not self.config.force_encode and encoded_ready_path.exists():
             logger.info(f"Skip making encoded tar.")
             return
 
@@ -224,6 +172,52 @@ class TaskBase(ABC):
                     sink.write({"pth": buf.getvalue(), **sample})
 
         encoded_ready_path.touch()
+
+    def run_mlp(self) -> float:
+        if self.config.k_fold_splits:
+            # K-fold cross validation
+            acc = []
+            splits = self._make_splits()
+            wds_encoded_training_fold_k = {
+                k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
+            }
+
+            for k in splits:
+                self.config.ckpt_name = f"fold_{k}_best_model.pt"
+                self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
+                self.train_mlp(
+                    wds_encoded_training_fold_k[k],
+                    [self.encoded_tar_path_of_split[k].as_posix()],
+                )
+                acc.append(
+                    self.evaluate_mlp(
+                        [self.encoded_tar_path_of_split[k].as_posix()], metric=self.config.metric, load_ckpt=True
+                    )
+                )
+
+            for k in range(len(splits)):
+                logger.info(f"Fold {k+1} accuracy: {acc[k]}")
+
+            avg_score = np.mean(acc)
+            logger.info(f"The averaged accuracy of 5 folds is: {avg_score}")
+
+            return avg_score
+
+        else:
+            # Single split
+            self.train_mlp(
+                [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
+                [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
+            )
+            acc = self.evaluate_mlp(
+                [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
+                metric=self.config.metric,
+                load_ckpt=True,
+            )
+            logger.info(f"The accuracy: {acc}")
+
+            score = acc
+            return score
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
         self.mlp = Mlp(

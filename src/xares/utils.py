@@ -48,7 +48,7 @@ def download_zenodo_record(zenodo_id: str, target_dir: str, force_download=False
     unzip_file(f"{target_dir}/{zenodo_id}.zip", target_dir)
 
 
-def py_path_to_class(path: str, endswith: str | None = None) -> type:
+def attr_from_py_path(path: str, endswith: str | None = None) -> type:
     from importlib import import_module
 
     module_name = path.replace("/", ".").strip(".py")
@@ -58,8 +58,8 @@ def py_path_to_class(path: str, endswith: str | None = None) -> type:
     except ModuleNotFoundError:
         raise ValueError(f"Module not found: {module_name}")
 
-    classes = [cls for cls in dir(module) if not endswith or cls.endswith(endswith)]
-    if len(classes) != 1:
-        raise ValueError(f"Expected 1 class with endswith={endswith}, got {len(classes)}")
+    attr_list = [m for m in dir(module) if not endswith or m.endswith(endswith)]
+    if len(attr_list) != 1:
+        raise ValueError(f"Expected 1 class with endswith={endswith}, got {len(attr_list)}")
 
-    return getattr(module, classes[0])
+    return getattr(module, attr_list[0])

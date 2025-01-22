@@ -57,41 +57,9 @@ pip install -e .[examples]
 
 ## Run with the baseline pretrained audio encoder (Dasheng)
 
-The ESC-50 task is used as an example.
-
-```python
-from example.dasheng.dasheng_encoder import DashengEncoder
-from tasks.esc50.esc50_task import ESC50Task
-
-task = ESC50Task(encoder=DashengEncoder())
-
-score = task.run()
-```
-
-## Run all tasks parallelly
-
-You can run all tasks parallelly with the following command:
-
 ```bash
-python run.py [-h] [--max-jobs MAX_JOBS] [--task-list TASK_LIST] encoder_module encoder_class
+python -m xares.run --max-jobs 8 example/dasheng/dasheng_encoder.py "src/tasks/*.py"
 ```
-
-The command line arguments are as follows:
-
-```plaintext
-Run tasks with a maximum concurrency limit.
-
-positional arguments:
-  encoder_module        Encoder module. eg: example.dasheng.dasheng_encoder
-  encoder_class         Encoder classname. eg: DashengEncoder
-
-options:
-  -h, --help            show this help message and exit
-  --max-jobs MAX_JOBS   Maximum number of concurrent tasks.
-  --task-list TASK_LIST File containing a list of task modules to execute.
-```
-
-There is an example task list file at `tasklist`.
 
 ## Run with your own pretrained audio encoder
 
@@ -102,11 +70,17 @@ We provide a check function to verify if the encoder is correctly implemented:
 ```python
 >>> from xares.audio_encoder_checker import check_audio_encoder
 
->>> encoder = DashengEncoder()
+>>> encoder = YourEncoder()
 >>> check_audio_encoder(encoder)
 True
 ```
 
+And then you can run the benchmark with your own encoder:
+
+```bash
+python -m xares.run --max-jobs 8 your_encoder.py "src/tasks/*.py"
+```
+
 ## Add your own task
 
-To add a new task, refer to existing task implementations for guidance. Essentially, create a task class that inherits from `TaskBase` and implements the `make_encoded_tar()` and the `run()` tailored to your chosen dataset.
+To add a new task, refer to the existing task implementations for guidance. You need to create a TaskConfig tailored to your chosen dataset.
