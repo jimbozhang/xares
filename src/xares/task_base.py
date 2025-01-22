@@ -25,7 +25,9 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
     env_root: Path | str | None = None
+
     # General
+    private: bool = False
     torch_num_threads: int = 1  # Do not use too many otherwise slows down
     seed: int = 42  # manual seed for all experiments
     label_processor: Callable = field(default=lambda x: x)
@@ -183,6 +185,8 @@ class TaskBase(ABC):
 
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
         if not audio_ready_path.exists():
+            if self.config.private:
+                raise ValueError("For private dataset, audio tar must be provided at local path.")
             download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
             audio_ready_path.touch()
 
