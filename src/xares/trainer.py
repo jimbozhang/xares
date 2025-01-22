@@ -107,7 +107,7 @@ class Trainer:
         eval_metric = self._metric_obj.metric()
         eval_metric.attach(local_evaluator, self.metric)
         local_evaluator.run(dl_eval)
-        return local_evaluator.state.metrics
+        return local_evaluator.state.metrics[self.metric]
 
     def run(self, dl_train, dl_dev):
         metrics = {'loss':Loss(self.model.criterion), self.metric : self._metric_obj.metric()}
@@ -224,7 +224,7 @@ class KNNTrainer:
         logger.info(
             f"KNN {self.metric}: {metrics[self.metric]:.3f}"
         )
-        return metrics
+        return metrics[self.metric]
 
 
 
