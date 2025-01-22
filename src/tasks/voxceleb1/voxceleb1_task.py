@@ -4,7 +4,7 @@ from xares.task_base import TaskBase, TaskConfig
 class VoxCeleb1Task(TaskBase):
     def __init__(self, encoder):
         data_key = "speakerid"
-        self.class_label_maps = {
+        class_label_maps = {
             "id10003": 0,
             "id10004": 1,
             "id10005": 2,
@@ -1258,19 +1258,16 @@ class VoxCeleb1Task(TaskBase):
             "id11251": 1250,
         }
         task_config = TaskConfig(
-            batch_size_train=64,
-            learning_rate=1e-3,
             train_split="voxceleb1_train",
             test_split="voxceleb1_test",
             valid_split="voxceleb1_valid",
             zenodo_id="TODO",
-            output_dim=len(self.class_label_maps),
-            epochs=50,
+            output_dim=len(class_label_maps),
             crop_length=6, # 6s 
+            label_processor=lambda x: class_label_maps[x[data_key]]
+
         )
         super().__init__(encoder, config=task_config)
-        self.label_processor = lambda x: self.class_label_maps[x[data_key]]
-
     def run(self):
         return self.default_run()
 

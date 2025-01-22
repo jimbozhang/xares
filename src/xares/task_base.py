@@ -21,7 +21,7 @@ from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_w
 from xares.common import XaresSettings
 from xares.metrics import METRICS_TYPE
 from xares.models import Mlp
-from xares.trainer import Trainer
+from xares.trainer import KNNTrainer, Trainer
 from xares.utils import download_zenodo_record, mkdir_if_not_exists
 
 
@@ -145,16 +145,21 @@ class TaskBase(ABC):
             [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
             [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
         )
-        score = self.evaluate_mlp(
+        mlp_score = self.evaluate_mlp(
             [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
             load_ckpt=True,
         )
-        return score
+        knn_score = self.run_knn(
+            [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
+            [self.encoded_tar_path_of_split[self.config.test_split].as_posix()]
+        )
+        logger.info(f"MLP Score: {mlp_score:.2%} KNNScore :{knn_score:.2%}")
+        return mlp_score
 
     def default_run_k_fold(self) -> float | np.floating | np.ndarray | torch.Tensor:
         self.make_encoded_tar()
 
-        acc = []
+        acc, knn_acc = [], []
         splits = self._make_splits()
         wds_encoded_training_fold_k = {
             k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
@@ -172,12 +177,16 @@ class TaskBase(ABC):
                     [self.encoded_tar_path_of_split[k].as_posix()], load_ckpt=True
                 )
             )
+            knn_acc.append(self.run_knn(
+                wds_encoded_training_fold_k[k],
+                [self.encoded_tar_path_of_split[k].as_posix()],
+            ))
 
         for k in range(len(splits)):
-            logger.info(f"Fold {k+1} accuracy: {acc[k]}")
+            logger.info(f"Fold {k+1} MLP accuracy: {acc[k]} KNN Accuracy: {knn_acc[k]}")
 
         avg_score = np.mean(acc)
-        logger.info(f"The averaged accuracy of 5 folds is: {avg_score}")
+        logger.info(f"The averaged MLP accuracy of 5 folds is: {avg_score} {np.mean(knn_acc)}")
 
         return avg_score
 
@@ -293,15 +302,30 @@ class TaskBase(ABC):
             label_processor=self.label_processor,
         )
         result = self.trainer.run_inference(dl)
-        for k,v in result.items():
-            logger.info(f"{k}: {v}")
+        # for k,v in result.items():
+            # logger.info(f"{k}: {v}")
         return result
 
-    def train_knn(self):
-        raise NotImplementedError
+    def run_knn(self, train_url, eval_url):
+        dl_train = create_embedding_webdataset(
+            train_url,
+            tar_shuffle=2000,
+            batch_size=self.config.batch_size_train,
+            num_workers=self.config.num_training_workers,
+            training=True,
+            label_processor=self.label_processor,
+        )
+        dl_eval = create_embedding_webdataset(
+            eval_url,
+            batch_size=self.config.batch_size_train,
+            num_workers=self.config.num_validation_workers,
+            training=False,
+            label_processor=self.label_processor,
+        )
+        knn_trainer = KNNTrainer(num_classes=self.config.output_dim)
+        scores = knn_trainer.train(dl_train, dl_eval)
+        return scores
 
-    def evaluate_knn(self):
-        raise NotImplementedError
 
     def _make_splits(self):
         splits = self.config.k_fold_splits or [self.config.train_split, self.config.valid_split, self.config.test_split]

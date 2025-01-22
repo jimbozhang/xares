@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import InitVar, dataclass, field
-from typing import Any, Callable, Dict, Iterable, Literal, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Iterable, List, Literal, Tuple
 from ignite.handlers import CosineAnnealingScheduler, EpochOutputStore, global_step_from_engine
 from ignite.metrics import Loss, RunningAverage
 
@@ -11,6 +11,7 @@ from ignite.engine import Engine, Events
 from ignite.handlers.tqdm_logger import ProgressBar
 from loguru import logger
 from torch import Tensor, nn, optim
+from torch.nn.functional import normalize
 from xares.metrics import ALL_METRICS, METRICS_TYPE
 
 
@@ -141,3 +142,103 @@ class Trainer:
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
         return self
+
+
+class KNN(torch.nn.Module):
+    def __init__(self,
+                 train_features:torch.Tensor,
+                 train_labels:torch.LongTensor,
+                 nb_knn: int = 10,
+                 device = 'cpu',
+                 T:float = 0.07,
+                 num_classes=50):
+        super().__init__()
+        self.device = device
+        self.train_features = normalize(train_features.T.to(self.device), dim=1, p=2)
+        self.train_labels = train_labels.view(1, -1).to(self.device)
+
+        self.nb_knn = nb_knn
+        self.T = T
+        self.num_classes = num_classes
+
+    def _get_knn_sims_and_labels(self, similarity, train_labels):
+        topk_sims, indices = similarity.topk(self.nb_knn,
+                                             largest=True,
+                                             sorted=True)
+        neighbors_labels = torch.gather(train_labels, 1, indices)
+        return topk_sims, neighbors_labels
+
+
+    def compute_neighbors(self, test_data:torch.Tensor) -> tuple[Tensor, Tensor]:
+
+        similarity_rank = test_data @ self.train_features
+        candidate_labels = self.train_labels.expand(len(similarity_rank), -1)
+        return self._get_knn_sims_and_labels(similarity_rank, candidate_labels)
+
+    def forward(self, test_features: torch.Tensor):
+        test_features = normalize(test_features, dim=1, p=2)
+        topk_sims, neighbors_labels = self.compute_neighbors(test_features)
+        b = test_features.shape[0]
+        topk_sims_transform = torch.nn.functional.softmax(
+            topk_sims / self.T, 1)
+        scores = torch.nn.functional.one_hot(
+            neighbors_labels,
+            num_classes=self.num_classes) * topk_sims_transform.view(b, -1, 1)
+        return torch.sum(scores[:, :self.nb_knn, :], 1)
+
+@dataclass
+class KNNTrainer:
+    num_classes: int
+    device: torch.device | Literal['cpu'] = field(
+        default_factory=lambda: torch.device('cpu'))
+    nb_knn: int = 10
+    temperature: float = 0.07
+    metric: METRICS_TYPE = "accuracy"
+
+    def __post_init__(self):
+        self._metric_obj = ALL_METRICS[self.metric]
+        self.trainer = Engine(lambda engine, batch: prepare_wds_batch_default(batch))
+        ProgressBar(bar_format=None).attach(self.trainer)
+        # self.evaluate_engine = Engine(lambda batch:)
+        EpochOutputStore().attach(self.trainer, "output")
+
+    def train(self, dl_train, dl_eval):
+        logger.info("KNN Feature extraction run.")
+        self.trainer.run(dl_train) # Store all features in memory, should be for most cases okay
+        train_data, train_labels = zip(*self.trainer.state.output)
+        train_data, train_labels = torch.cat(train_data,
+                                             0), torch.cat(train_labels,
+                                                           0).long()
+        knn_model = KNN(train_data, train_labels, nb_knn=self.nb_knn, num_classes=self.num_classes, T= self.temperature)
+        def test_step(engine, batch):
+            x, y =  prepare_wds_batch_default(batch)
+            return knn_model(x), y
+        eval_engine = Engine(test_step)
+
+        metrics = {self.metric : self._metric_obj.metric()}
+        for name, metric in metrics.items():
+            metric.attach(eval_engine, name)
+
+        eval_engine.run(dl_eval)
+        metrics =eval_engine.state.metrics
+        logger.info(
+            f"KNN {self.metric}: {metrics[self.metric]:.3f}"
+        )
+        return metrics
+
+
+
+
+
+
+if __name__ == "__main__":
+    train_x = torch.randn(1000, 64)
+    targets = torch.empty(1000).random_(10).long()
+    test_x = torch.randn(100, 64)
+
+
+    model = KNN(train_x, targets, nb_knn=[10,20,50], num_classes=10)
+
+    y = model(test_x)
+    for k,v in y.items():
+        print(k, v.shape)
