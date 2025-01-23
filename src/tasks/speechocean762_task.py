@@ -12,10 +12,9 @@ def speechocean762_config(encoder, **kwargs) -> TaskConfig:
         output_dim=1,
         metric="MSE",
         criterion="MSELoss",
-        batch_size_encode=1, # Just avoid padding for this task
+        batch_size_encode=1,  # Just avoid padding for this task
         label_processor=lambda x: float(x[data_key]),
         epochs=25,
         **kwargs,
     )
     return task_config
-

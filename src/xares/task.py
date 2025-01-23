@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import io
-import logging
 import json
+import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,18 +11,16 @@ from typing import Any, Callable, Dict, List, Literal
 import numpy as np
 import torch
 import torch.nn as nn
+import webdataset as wds
 from loguru import logger
 from tqdm import tqdm
 
-import webdataset as wds
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.metrics import METRICS_TYPE
 from xares.models import Mlp
 from xares.trainer import KNNTrainer, Trainer
 from xares.utils import download_zenodo_record, mkdir_if_not_exists
-
-
 
 
 @dataclass
@@ -73,7 +71,7 @@ class TaskConfig:
     num_validation_workers: int = 0
     model: nn.Module | None = None
     output_dim: int | None = None
-    metric: Literal["accuracy","EER","mAP","recall@k","MAE", "MSE"] = "accuracy"
+    metric: Literal["accuracy", "EER", "mAP", "recall@k", "MAE", "MSE"] = "accuracy"
 
     def __post_init__(self, **kwargs):
         self.update_tar_name_of_split()
@@ -162,7 +160,6 @@ class XaresTask:
             for split in self.config.audio_tar_name_of_split
         }
 
-
         for split in audio_tar_path_of_split:
             logger.info(f"Encoding audio for split {split} ...")
             logger.debug(f"Using data from {audio_tar_path_of_split[split]} ... ")
@@ -173,7 +170,7 @@ class XaresTask:
                 num_workers=self.config.num_encoder_workers,
                 batch_size=self.config.batch_size_encode,
                 crop_length=self.config.crop_length,
-                pad_last=True, # Add crop
+                pad_last=True,  # Add crop
             )
             sink = wds.ShardWriter(
                 self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0%05d"),
@@ -184,13 +181,21 @@ class XaresTask:
             )
 
             with torch.inference_mode():
-                for enum_item,((audio, audio_length), json_data, filenames) in tqdm(enumerate(dl), desc=f"Encoding {split}", leave=True):
+                for enum_item, ((audio, audio_length), json_data, filenames) in tqdm(
+                    enumerate(dl), desc=f"Encoding {split}", leave=True
+                ):
                     audio = audio.to(self.encoder_device)
                     embedding = self.encoder(audio).to("cpu").detach()
                     for embed, json_data_sample, filename in zip(embedding, json_data, filenames):
                         buf = io.BytesIO()
-                        np.save(buf,embed.numpy())
-                        sink.write({"npy": buf.getvalue(), 'json': json.dumps(json_data_sample).encode('utf-8'), '__key__': f"{filename}{enum_item}"})
+                        np.save(buf, embed.numpy())
+                        sink.write(
+                            {
+                                "npy": buf.getvalue(),
+                                "json": json.dumps(json_data_sample).encode("utf-8"),
+                                "__key__": f"{filename}{enum_item}",
+                            }
+                        )
 
         encoded_ready_path.touch()
 
@@ -210,11 +215,7 @@ class XaresTask:
                     wds_encoded_training_fold_k[k],
                     [self.encoded_tar_path_of_split[k].as_posix()],
                 )
-                acc.append(
-                    self.evaluate_mlp(
-                        [self.encoded_tar_path_of_split[k].as_posix()], load_ckpt=True
-                    )
-                )
+                acc.append(self.evaluate_mlp([self.encoded_tar_path_of_split[k].as_posix()], load_ckpt=True))
 
             for k in range(len(splits)):
                 logger.info(f"Fold {k+1} {self.config.metric}: {acc[k]}")
@@ -249,14 +250,12 @@ class XaresTask:
             metric=self.config.metric,
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
-
         )
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
             self.trainer.load_state_dict(torch.load(self.ckpt_path))
             return
-
 
         dl_train = create_embedding_webdataset(
             train_url,
@@ -276,7 +275,7 @@ class XaresTask:
 
         self.trainer.run(dl_train, dl_val)
 
-    def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Dict[METRICS_TYPE,Any]:
+    def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Dict[METRICS_TYPE, Any]:
         if self.trainer is None:
             raise ValueError("Train the model first before evaluation.")
 
@@ -295,9 +294,8 @@ class XaresTask:
         )
         result = self.trainer.run_inference(dl)
         # for k,v in result.items():
-            # logger.info(f"{k}: {v}")
+        # logger.info(f"{k}: {v}")
         return result
-
 
     def run_knn(self):
         if self.config.k_fold_splits:
@@ -310,10 +308,11 @@ class XaresTask:
 
             for k in splits:
                 score.append(
-                self.train_knn(
-                    wds_encoded_training_fold_k[k],
-                    [self.encoded_tar_path_of_split[k].as_posix()],
-                ))
+                    self.train_knn(
+                        wds_encoded_training_fold_k[k],
+                        [self.encoded_tar_path_of_split[k].as_posix()],
+                    )
+                )
 
             for k in range(len(splits)):
                 logger.info(f"Fold {k+1} {self.config.metric}: {score[k]}")
@@ -358,8 +357,6 @@ class XaresTask:
         mlp_score = self.run_mlp()
         knn_score = self.run_knn()
         return mlp_score, knn_score
-
-        
 
     def _make_splits(self):
         splits = self.config.k_fold_splits or [self.config.train_split, self.config.valid_split, self.config.test_split]

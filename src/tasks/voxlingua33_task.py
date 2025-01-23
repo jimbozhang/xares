@@ -38,8 +38,6 @@ def voxlingua33_config(encoder) -> TaskConfig:
         "sr": 32,
     }
 
-
-
     task_config = TaskConfig(
         **{
             "name": "voxlingua33",
@@ -54,6 +52,7 @@ def voxlingua33_config(encoder) -> TaskConfig:
             "epochs": 50,
             "batch_size_encode": 64,
             "crop_length": 10,
-        })
+        }
+    )
 
     return task_config

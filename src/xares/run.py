@@ -71,7 +71,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a task")
     parser.add_argument("encoder_py", type=str, help="Encoder path. eg: example/dasheng/dasheng_encoder.py")
     parser.add_argument(
-        "tasks_py", type=str, help='Tasks path. eg: src/tasks/*.py', nargs="+",
+        "tasks_py",
+        type=str,
+        help="Tasks path. eg: src/tasks/*.py",
+        nargs="+",
     )
     parser.add_argument("--max-jobs", type=int, default=1, help="Maximum number of concurrent tasks.")
     args = parser.parse_args()

@@ -22,7 +22,6 @@ def ravdess_config(encoder) -> TaskConfig:
         "label_processor": lambda x: class_label_maps[x["emotion"]],
     }
 
-
     config = TaskConfig(**config_params)
 
     config.audio_tar_name_of_split = {fold: f"ravdess_fold_{fold}_0000000.tar" for fold in config.k_fold_splits}

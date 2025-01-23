@@ -24,7 +24,6 @@ def nysnthinstument_config(encoder) -> TaskConfig:
         valid_split="nsynth_valid",
         zenodo_id="TODO",
         output_dim=len(class_label_maps),
-        label_processor = lambda x: class_label_maps[x[data_key]],
+        label_processor=lambda x: class_label_maps[x[data_key]],
     )
     return task_config
-

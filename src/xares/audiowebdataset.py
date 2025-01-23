@@ -17,6 +17,7 @@ def fast_warn_and_continue(exn):
     warnings.warn(repr(exn))
     return True
 
+
 def crop_or_pad_audio(wav: torch.Tensor, crop_size: int, pad_last: bool = False):
     n_samples, *_ = wav.shape
     available_crops = n_samples // crop_size
@@ -54,6 +55,7 @@ def _seq_crop_audio(
 
         for crop in crops:
             yield (crop, *extra)
+
 
 class Audiowebdataset(wds.DataPipeline):
 
@@ -122,7 +124,6 @@ class Audiowebdataset(wds.DataPipeline):
                 wds.to_tuple(*rename_keys.keys()),
             ]
         )
-
 
         if merge_function is not None:
             pipeline.extend([merge_function])
@@ -213,21 +214,23 @@ def collate_with_lengths_wds(
 
 # Returns (single) dicts with (audio=audio_data, *extra ), useful for only reading audio and keeping other items the same
 def create_rawaudio_webdataset(
-    urls: List[str] |  Dict[str, List[str]],
+    urls: List[str] | Dict[str, List[str]],
     target_sample_rate: Optional[int] = None,
     mono: bool = True,
     num_workers: int = 4,
-    batch_size:int = 64,
+    batch_size: int = 64,
     crop_length: float | None = None,
-    pad_last: bool = False, # If only 1 crop available, use padding 
+    pad_last: bool = False,  # If only 1 crop available, use padding
     **kwargs,
 ):
 
     dataset_kwargs = dict(
         batch_size=batch_size,
         rename_keys=(dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", json="json", filename="__key__")),
-        target_sample_rate = target_sample_rate,
-        merge_function = partial(_seq_crop_audio, crop_length = crop_length , mono=mono, drop_clipped=False, pad_last= pad_last),
+        target_sample_rate=target_sample_rate,
+        merge_function=partial(
+            _seq_crop_audio, crop_length=crop_length, mono=mono, drop_clipped=False, pad_last=pad_last
+        ),
     )
     urls = expand_with_brace(urls)
     dataset = Audiowebdataset(urls, **dataset_kwargs)
@@ -257,9 +260,10 @@ def create_embedding_webdataset(
         batch_size=batch_size,
         rename_keys=dict(embedding="npy", target="json", filename="__key__"),
         map_kwargs=dict(
-            embedding=lambda x: x.transpose(), target=label_processor if label_processor else lambda x: x,
+            embedding=lambda x: x.transpose(),
+            target=label_processor if label_processor else lambda x: x,
         ),  # Transpose (B,T,D) -> (B,D,T), map the labels if provided
-        merge_function = merge_processor,
+        merge_function=merge_processor,
     )
     if balanced_sampler:
         assert isinstance(urls, dict)

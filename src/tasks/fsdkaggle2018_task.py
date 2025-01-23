@@ -49,7 +49,7 @@ def fsdkaggle2018_config(encoder) -> TaskConfig:
 
     config_params = {
         "name": "fsdkaggle2018",
-        "encoder":encoder,
+        "encoder": encoder,
         "batch_size_train": 64,
         "learning_rate": 1e-3,
         "train_split": "fsd18_train",
@@ -60,7 +60,6 @@ def fsdkaggle2018_config(encoder) -> TaskConfig:
         "label_processor": lambda x: class_label_maps[x[data_key]],
         "epochs": 20,
     }
-
 
     config = TaskConfig(**config_params)
 
