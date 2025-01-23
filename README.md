@@ -2,54 +2,42 @@
 
 X-ARES: eXtensive Audio Representation and Evaluation Suite
 
-**This project is still in the early stage of development and welcomes contributions, especially in expanding supported tasks and improving robustness.**
-
 ## Introduction
 
 X-ARES is a toolkit for training, evaluating, and exporting audio encoders for various audio tasks. It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/).
 
-## Planned supported tasks
-
-Currently, only four tasks (ESC-50, VocalSound, CREMA-D and LibriSpeech-Male-Female) have been implemented. However, adding new tasks is straightforward: it typically only need to implement the audio data download and packaging functions, as manual audio decoding and training implementations are not necessary. We encourage anyone to submit pull requests to expand the set of supported tasks.
+## Supported tasks
 
 ### Speech
 
-- Speech Commands V1
-- Speech Commands V2
-- LibriCount
-- VoxLingua107
-- VoxCeleb1
-- LibriSpeech-Male-Female
-- LibriSpeech-Phoneme
-- Fluent Speech Commands
-- VocalSound
-- CREMA-D
-- RAVDESS
-- ASV2015
-- DiCOVA
-- speechocean762
+- [x] Speech Commands V2
+- [x] LibriCount
+- [x] VoxLingua107
+- [x] VoxCeleb1
+- [x] LibriSpeech-Male-Female
+- [x] Fluent Speech Commands
+- [x] VocalSound
+- [x] CREMA-D
+- [x] RAVDESS
+- [ ] LibriSpeech-Phoneme
+- [ ] speechocean762
+- [x] ASV2015
 
 ### Environment
 
-- ESC-50
-- FSD50k
-- UrbanSound 8k
-- DESED
-- (A task designed for car)
-- (Another task designed for car)
-- (A task designed for soundbox)
-- (A task designed for headphone)
-- LITIS Rouen
-- FSD18-Kaggle
-- AudioCaps
+- [x] ESC-50
+- [ ] FSD50k
+- [x] UrbanSound 8k
+- [ ] DESED
+- [ ] FSD18-Kaggle
+- [x] Clotho
 
 ### Music
 
-- MAESTRO
-- GTZAN Genre
-- NSynth
-- MTG-Jamendo
-- FMA
+- [ ] MAESTRO
+- [x] GTZAN Genre
+- [ ] NSynth
+- [ ] FMA
 
 ## Installation
 
@@ -69,15 +57,8 @@ pip install -e .[examples]
 
 ## Run with the baseline pretrained audio encoder (Dasheng)
 
-The ESC-50 task is used as an example.
-
-```python
-from example.dasheng.dasheng_encoder import DashengEncoder
-from tasks.esc50.esc50_task import ESC50Task
-
-task = ESC50Task(encoder=DashengEncoder())
-
-score = task.run()
+```bash
+python -m xares.run --max-jobs 8 example/dasheng/dasheng_encoder.py "src/tasks/*.py"
 ```
 
 ## Run with your own pretrained audio encoder
@@ -88,11 +69,18 @@ We provide a check function to verify if the encoder is correctly implemented:
 
 ```python
 >>> from xares.audio_encoder_checker import check_audio_encoder
->>> encoder = DashengEncoder()
+
+>>> encoder = YourEncoder()
 >>> check_audio_encoder(encoder)
 True
 ```
 
+And then you can run the benchmark with your own encoder:
+
+```bash
+python -m xares.run --max-jobs 8 your_encoder.py "src/tasks/*.py"
+```
+
 ## Add your own task
 
-To add a new task, refer to existing task implementations for guidance. Essentially, create a task class that inherits from `TaskBase` and implements the `make_encoded_tar()` and the `run()` tailored to your chosen dataset.
+To add a new task, refer to the existing task implementations for guidance. You need to create a TaskConfig tailored to your chosen dataset.

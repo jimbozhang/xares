@@ -31,7 +31,10 @@ from xares.utils import download_zenodo_record, mkdir_if_not_exists
 class TaskConfig:
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
     env_root: Path | str | None = None
+    name: str = "default_task"
+
     # General
+    private: bool = False
     torch_num_threads: int = 2  # Do not use too many otherwise slows down
     seed: int = 42  # manual seed for all experiments
     label_processor: Callable = field(default=lambda x: x)
@@ -50,7 +53,7 @@ class TaskConfig:
     zenodo_id: str | None = None
 
     # Encoded tar
-    force_encoded: bool = False
+    force_encode: bool = False
     encoder: Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
@@ -68,19 +71,22 @@ class TaskConfig:
     batch_size_train: int = 32
     learning_rate: float = 1e-3
     epochs: int = 10
-    num_training_workers: int = 4
-    num_validation_workers: int = 4
+    num_training_workers: int = 0
+    num_validation_workers: int = 0
     model: nn.Module | None = None
     output_dim: int | None = None
     metric: Literal["accuracy","EER","mAP","recall@k","MAE", "MSE"] = "accuracy"
 
-    def __post_init__(self):
+    def __post_init__(self, **kwargs):
         self.update_tar_name_of_split()
         if self.env_root is None:
             self.env_root = self.xares_settings.env_root
         torch.set_num_threads(self.torch_num_threads)
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def update_tar_name_of_split(self):
         if self.k_fold_splits is not None:
@@ -99,8 +105,8 @@ class TaskConfig:
             }
 
 
-class TaskBase(ABC):
-    def __init__(self, encoder: Callable, config: None | TaskConfig = None):
+class XaresTask:
+    def __init__(self, encoder: nn.Module, config: None | TaskConfig = None):
         logging.captureWarnings(True)
         logging.getLogger("py.warnings").setLevel(logging.ERROR)
         # Make the logger with this format the default for all loggers in this package
@@ -114,11 +120,16 @@ class TaskBase(ABC):
             ]
         )
 
-        self.config = config or TaskConfig(encoder=self.encoder)
-        self.encoder = encoder
-        self.trainer = None
+        self.config = config or TaskConfig()
+        self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.encoder = encoder.to(self.encoder_device)
+        self.mlp = None
 
-        self.env_dir = Path(self.config.env_root) / self.__class__.__name__.lower().replace("task", "")
+        torch.set_num_threads(self.config.torch_num_threads)
+        torch.manual_seed(self.config.seed)
+        np.random.seed(self.config.seed)
+
+        self.env_dir = Path(self.config.env_root) / self.config.name
         self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
@@ -130,81 +141,21 @@ class TaskBase(ABC):
 
         self.label_processor = self.config.label_processor
 
-    @abstractmethod
-    def run(self):
-        pass
-
-    @abstractmethod
     def make_encoded_tar(self):
-        pass
-
-    def default_run(self) -> Dict[str, Any]:
-        self.make_encoded_tar()
-
-        self.train_mlp(
-            [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
-            [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
-        )
-        mlp_score = self.evaluate_mlp(
-            [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
-            load_ckpt=True,
-        )
-        knn_score = self.run_knn(
-            [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
-            [self.encoded_tar_path_of_split[self.config.test_split].as_posix()]
-        )
-        logger.info(f"MLP Score: {mlp_score:.2%} KNNScore: {knn_score:.2%}")
-        return mlp_score
-
-    def default_run_k_fold(self) -> float | np.floating | np.ndarray | torch.Tensor:
-        self.make_encoded_tar()
-
-        acc, knn_acc = [], []
-        splits = self._make_splits()
-        wds_encoded_training_fold_k = {
-            k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
-        }
-
-        for k in splits:
-            self.config.ckpt_name = f"fold_{k}_best_model.pt"
-            self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
-            self.train_mlp(
-                wds_encoded_training_fold_k[k],
-                [self.encoded_tar_path_of_split[k].as_posix()],
-            )
-            acc.append(
-                self.evaluate_mlp(
-                    [self.encoded_tar_path_of_split[k].as_posix()], load_ckpt=True
-                )
-            )
-            knn_acc.append(self.run_knn(
-                wds_encoded_training_fold_k[k],
-                [self.encoded_tar_path_of_split[k].as_posix()],
-            ))
-
-        for k in range(len(splits)):
-            logger.info(f"Fold {k+1} MLP accuracy: {acc[k]} KNN Accuracy: {knn_acc[k]}")
-
-        avg_score = np.mean(acc)
-        logger.info(f"The averaged MLP accuracy of 5 folds is: {avg_score} {np.mean(knn_acc)}")
-
-        return avg_score
-
-    def default_make_encoded_tar(self):
-        accelerator = Accelerator()
-        self.encoder = accelerator.prepare(self.encoder)
         self.encoded_tar_path_of_split = {
             split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
             for split in self.config.encoded_tar_name_of_split
         }
 
         encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
-        if not self.config.force_encoded and encoded_ready_path.exists():
+        if not self.config.force_encode and encoded_ready_path.exists():
             logger.info(f"Skip making encoded tar.")
             return
 
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
-        if not audio_ready_path.exists() and accelerator.main_process_first:
+        if not audio_ready_path.exists():
+            if self.config.private:
+                raise ValueError("For private dataset, audio tar must be provided at local path.")
             download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
             audio_ready_path.touch()
 
@@ -219,7 +170,8 @@ class TaskBase(ABC):
             logger.debug(f"Using data from {audio_tar_path_of_split[split]} ... ")
             dl = create_rawaudio_webdataset(
                 [audio_tar_path_of_split[split]],
-                target_sample_rate=self.encoder.required_sampling_rate,
+                target_sample_rate=self.encoder.sampling_rate,
+                audio_key_name="audio",
                 num_workers=self.config.num_encoder_workers,
                 batch_size=self.config.batch_size_encode,
                 crop_length=self.config.crop_length,
@@ -244,6 +196,52 @@ class TaskBase(ABC):
 
         if accelerator.is_main_process:
             encoded_ready_path.touch()
+
+    def run_mlp(self) -> float:
+        if self.config.k_fold_splits:
+            # K-fold cross validation
+            acc = []
+            splits = self._make_splits()
+            wds_encoded_training_fold_k = {
+                k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
+            }
+
+            for k in splits:
+                self.config.ckpt_name = f"fold_{k}_best_model.pt"
+                self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
+                self.train_mlp(
+                    wds_encoded_training_fold_k[k],
+                    [self.encoded_tar_path_of_split[k].as_posix()],
+                )
+                acc.append(
+                    self.evaluate_mlp(
+                        [self.encoded_tar_path_of_split[k].as_posix()], metric=self.config.metric, load_ckpt=True
+                    )
+                )
+
+            for k in range(len(splits)):
+                logger.info(f"Fold {k+1} accuracy: {acc[k]}")
+
+            avg_score = np.mean(acc)
+            logger.info(f"The averaged accuracy of 5 folds is: {avg_score}")
+
+            return avg_score
+
+        else:
+            # Single split
+            self.train_mlp(
+                [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
+                [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
+            )
+            acc = self.evaluate_mlp(
+                [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
+                metric=self.config.metric,
+                load_ckpt=True,
+            )
+            logger.info(f"The accuracy: {acc}")
+
+            score = acc
+            return score
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
         mlp = Mlp(
