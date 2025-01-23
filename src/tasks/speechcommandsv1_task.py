@@ -1,7 +1,7 @@
 from xares.task import TaskConfig
 
 
-def speechcommandsv1_config(**kwargs) -> TaskConfig:
+def speechcommandsv1_config(encoder) -> TaskConfig:
     class_label_maps = {
         "sheila": 0,
         "up": 1,
@@ -37,6 +37,7 @@ def speechcommandsv1_config(**kwargs) -> TaskConfig:
     data_key = "labels"
 
     config_params = {
+        "encoder": encoder,
         "name": "speechcommandsv1",
         "batch_size_train": 64,
         "learning_rate": 1e-3,
@@ -48,7 +49,4 @@ def speechcommandsv1_config(**kwargs) -> TaskConfig:
         "label_processor": lambda x: class_label_maps[x[data_key]],
         "epochs": 50,
     }
-
-    config_params.update(kwargs)
-
     return TaskConfig(**config_params)

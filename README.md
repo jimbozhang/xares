@@ -58,8 +58,20 @@ pip install -e .[examples]
 ## Run with the baseline pretrained audio encoder (Dasheng)
 
 ```bash
-python -m xares.run --max-jobs 8 example/dasheng/dasheng_encoder.py "src/tasks/*.py"
+python -m xares.run --max-jobs 8 example/dasheng/dasheng_encoder.py src/tasks/*.py
 ```
+
+Or from inside python:
+
+```python
+from xares.task import XaresTask
+from example.dasheng.dasheng_encoder import DashengEncoder
+from tasks.asvspoof_task import asvspoof2015_config
+task = XaresTask(encoder=DashengEncoder(), config=asvspoof2015_config())
+task.run()
+```
+
+
 
 ## Run with your own pretrained audio encoder
 
@@ -78,7 +90,7 @@ True
 And then you can run the benchmark with your own encoder:
 
 ```bash
-python -m xares.run --max-jobs 8 your_encoder.py "src/tasks/*.py"
+python -m xares.run --max-jobs 8 your_encoder.py src/tasks/*.py
 ```
 
 ## Add your own task

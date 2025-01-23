@@ -1,7 +1,7 @@
 from xares.task import TaskConfig
 
 
-def fsdkaggle2018_config(**kwargs) -> TaskConfig:
+def fsdkaggle2018_config(encoder) -> TaskConfig:
     data_key = "sound"
     class_label_maps = {
         "Hi-hat": 0,
@@ -49,6 +49,7 @@ def fsdkaggle2018_config(**kwargs) -> TaskConfig:
 
     config_params = {
         "name": "fsdkaggle2018",
+        "encoder":encoder,
         "batch_size_train": 64,
         "learning_rate": 1e-3,
         "train_split": "fsd18_train",
@@ -60,7 +61,6 @@ def fsdkaggle2018_config(**kwargs) -> TaskConfig:
         "epochs": 20,
     }
 
-    config_params.update(kwargs)
 
     config = TaskConfig(**config_params)
 

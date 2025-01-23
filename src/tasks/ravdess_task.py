@@ -1,7 +1,7 @@
 from xares.task import TaskConfig
 
 
-def ravdess_config(**kwargs) -> TaskConfig:
+def ravdess_config(encoder) -> TaskConfig:
     class_label_maps = {
         "neutral": 0,
         "calm": 1,
@@ -15,13 +15,13 @@ def ravdess_config(**kwargs) -> TaskConfig:
 
     config_params = {
         "name": "ravdess",
+        "encoder": encoder,
         "zenodo_id": "TODO",
         "k_fold_splits": list(range(0, 4)),
         "output_dim": len(class_label_maps),
         "label_processor": lambda x: class_label_maps[x["emotion"]],
     }
 
-    config_params.update(kwargs)
 
     config = TaskConfig(**config_params)
 

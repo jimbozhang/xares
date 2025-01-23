@@ -1,10 +1,11 @@
 from xares.task import TaskConfig
 
 
-def vocalsound_config(**kwargs) -> TaskConfig:
+def vocalsound_config(encoder) -> TaskConfig:
     config_params = {
         "name": "vocalsound",
-        "zenodo_id": "14641593",
+        "encoder": encoder,
+        "zenodo_id": "TODO",
         "output_dim": 6,
         "label_processor": lambda x: {
             "laughter": 0,
@@ -15,6 +16,5 @@ def vocalsound_config(**kwargs) -> TaskConfig:
             "sniff": 5,
         }.get(x["label"], -1),
     }
-    config_params.update(kwargs)
     config = TaskConfig(**config_params)
     return config

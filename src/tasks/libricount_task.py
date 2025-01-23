@@ -1,10 +1,11 @@
 from xares.task import TaskConfig
 
 
-def libricount_config(**kwargs) -> TaskConfig:
+def libricount_config(encoder) -> TaskConfig:
     task = "num_speakers"
     class_label_maps = {i: i for i in range(11)}
     config_params = {
+        "encoder": encoder,
         "name": "libricount",
         "zenodo_id": "TODO",
         "learning_rate": 1e-3,
@@ -13,7 +14,6 @@ def libricount_config(**kwargs) -> TaskConfig:
         "output_dim": len(class_label_maps),
         "label_processor": lambda x: class_label_maps[x[task]],
     }
-    config_params.update(kwargs)
 
     config = TaskConfig(**config_params)
 

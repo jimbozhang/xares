@@ -7,6 +7,7 @@ class DashengEncoder(torch.nn.Module):
         super().__init__()
         self.sampling_rate = 16000
         self.output_dim = 768
+        self.hop_size_in_ms = 40
         self.model = dasheng_base()
 
     def forward(self, audio: torch.Tensor):
