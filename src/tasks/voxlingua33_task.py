@@ -1,7 +1,7 @@
 from xares.task import TaskConfig
 
 
-def voxlingua33_config(**kwargs) -> TaskConfig:
+def voxlingua33_config(encoder) -> TaskConfig:
     class_label_maps = {
         "uk": 0,
         "zh": 1,
@@ -38,20 +38,22 @@ def voxlingua33_config(**kwargs) -> TaskConfig:
         "sr": 32,
     }
 
-    config_params = {
-        "name": "voxlingua33",
-        "batch_size_train": 64,
-        "learning_rate": 1e-3,
-        "train_split": "train_subset",
-        "test_split": "dev",
-        "valid_split": "dev",
-        "zenodo_id": "TODO",
-        "output_dim": len(class_label_maps),
-        "epochs": 50,
-    }
 
-    config_params.update(kwargs)
 
-    task_config = TaskConfig(**config_params)
+    task_config = TaskConfig(
+        **{
+            "name": "voxlingua33",
+            "encoder": encoder,
+            "batch_size_train": 64,
+            "learning_rate": 1e-3,
+            "train_split": "train_subset",
+            "test_split": "dev",
+            "valid_split": "dev",
+            "zenodo_id": "TODO",
+            "output_dim": len(class_label_maps),
+            "epochs": 50,
+            "batch_size_encode": 64,
+            "crop_length": 10,
+        })
 
     return task_config

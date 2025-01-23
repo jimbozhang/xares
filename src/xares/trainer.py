@@ -1,36 +1,19 @@
 from __future__ import annotations
 
-import sys
-from dataclasses import dataclass
-from typing import Dict, Iterable, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Iterable, List, Literal, Tuple
+from ignite.handlers import CosineAnnealingScheduler, EpochOutputStore, global_step_from_engine
+from ignite.metrics import Loss, RunningAverage
 
 import torch
 import torch.nn as nn
-from accelerate import Accelerator
-from ignite.contrib.metrics import AveragePrecision
 from ignite.engine import Engine, Events
 from ignite.handlers.tqdm_logger import ProgressBar
-from ignite.metrics import Accuracy, Loss, RunningAverage
 from loguru import logger
 from torch import Tensor, nn, optim
-from tqdm import tqdm
+from torch.nn.functional import normalize
+from xares.metrics import ALL_METRICS, METRICS_TYPE
 
-# Make the logger with this format the default for all loggers in this package
-logger.configure(
-    handlers=[
-        {
-            "sink": sys.stdout,
-            "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
-            "level": "DEBUG",
-        }
-    ]
-)
-
-
-MetricType = {
-    "accuracy": Accuracy,
-    "mAP": AveragePrecision,
-}
 
 
 def length_to_mask(length):
@@ -47,23 +30,43 @@ def masked_mean(x, x_length, dim: int = -1):
 
 
 def cast_to_tensor(y: Iterable):
-    return torch.tensor(y) if not isinstance(y, torch.Tensor) else y
+    y = torch.tensor(y) if not isinstance(y, torch.Tensor) else y
+    return y.float() if y.is_floating_point() else y
+
+
+def prepare_wds_batch_default(batch: Tuple,
+                              device: torch.device | str = 'cpu'):
+    (x, x_length), y, _ = batch
+    x = masked_mean(x, x_length=x_length, dim=-1)
+    y = cast_to_tensor(y)
+    return x.to(device), y.to(device)
+
+
+def default_validation_func(model:torch.nn.Module, device: torch.device | str = 'cpu') -> Callable:
+    def validation_step(engine: Engine, batch: Tuple) -> Tuple[Tensor, Tensor]:
+        model.eval()
+        with torch.inference_mode():
+            y_pred, y = model(*prepare_wds_batch_default(batch,device), return_loss=False)
+            return y_pred, y
+    return validation_step
+
 
 
 @dataclass
 class Trainer:
     model: nn.Module
-    accelerator: Accelerator = Accelerator()
+    validation_func: Callable | None = None
+    device: torch.device | Literal['cpu'] = field(default_factory=lambda : torch.device('cpu'))
     optimizer: str = "Adam"
     lr: float = 3e-3
     max_epochs: int = 10
     ckpt_dir: str = "checkpoints"
     best_ckpt_path: str | None = None
     ckpt_name: str = "best_model.pt"
-    metric: str = "accuracy"
+    metric: METRICS_TYPE = "accuracy"
     label_name: str = "target"
-    best_metric: float = 0.0
     save_model: bool = True
+    decay_fraction: float = 0.1 # Decay learning rate
 
     def __post_init__(self):
         try:
@@ -71,43 +74,44 @@ class Trainer:
         except AttributeError:
             raise NotImplementedError(f"Optimizer {self.optimizer} not implemented.")
 
-        self.model.to(self.accelerator.device)
         self.ignite_trainer = Engine(self.train_step)
-        self.ignite_evaluator = Engine(self.validation_step)
-        ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(
-            self.ignite_trainer, output_transform=lambda x: x
-        )
+        self.ignite_evaluator = Engine(
+            default_validation_func(self.model, device=self.device)
+            if self.validation_func is None else self.
+            validation_func(self.model, device=self.device))
+        # Schedule cosine annealing during training
+        scheduler = CosineAnnealingScheduler(
+                self.optimizer, 'lr', self.optimizer.param_groups[0]['lr'],
+                self.lr * self.decay_fraction, self.max_epochs)
+        self.ignite_trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
+
+        self.model = self.model.to(self.device)
+        self._metric_obj = ALL_METRICS[self.metric]
+        ProgressBar(bar_format=None,
+                    ).attach(
+                        self.ignite_trainer, output_transform=lambda x: x)
         RunningAverage(output_transform=lambda x: x["loss"]).attach(self.ignite_trainer, "loss_avg")
-        ProgressBar(bar_format=None, disable=not self.accelerator.is_main_process).attach(self.ignite_evaluator)
+        ProgressBar(bar_format=None).attach(self.ignite_evaluator)
 
-    @classmethod
-    def decode_wds_batch(cls, batch: Tuple):
-        (x, x_length), y, _ = batch
-        x = masked_mean(x, x_length=x_length, dim=-1)
-        y = cast_to_tensor(y)
-        return x.to(cls.accelerator.device), y.to(cls.accelerator.device)
 
-    def train_step(self, engine: Engine, batch: Tensor) -> Dict[str, Tensor]:
+    def train_step(self, engine: Engine, batch: Tuple) -> Dict[str, Tensor]:
         self.model.train()
-        with torch.enable_grad(), self.accelerator.accumulate(self.model):
+        with torch.enable_grad():
             self.optimizer.zero_grad()
-            loss = self.model(*self.decode_wds_batch(batch), return_loss=True)
-            self.accelerator.backward(loss)
+            loss = self.model(*prepare_wds_batch_default(batch,self.device), return_loss=True)
+            loss.backward()
             self.optimizer.step()
             return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 
-    def validation_step(self, engine: Engine, batch: Iterable[Tensor]) -> Tuple[Tensor, Tensor]:
-        self.model.eval()
-        with torch.inference_mode():
-            y_pred, y = self.model(*self.decode_wds_batch(batch))
-            return y_pred, y
+    def run_inference(self, dl_eval: Iterable):
+        local_evaluator = self.ignite_evaluator
+        eval_metric = self._metric_obj.metric()
+        eval_metric.attach(local_evaluator, self.metric)
+        local_evaluator.run(dl_eval)
+        return local_evaluator.state.metrics[self.metric]
 
     def run(self, dl_train, dl_dev):
-        self.model, self.optimizer, dl_train, dl_dev = self.accelerator.prepare(
-            self.model, self.optimizer, dl_train, dl_dev
-        )
-
-        metrics = {"loss": Loss(self.model.criterion), self.metric: MetricType[self.metric]()}
+        metrics = {'loss':Loss(self.model.criterion), self.metric : self._metric_obj.metric()}
         for name, metric in metrics.items():
             metric.attach(self.ignite_evaluator, name)
 
@@ -118,45 +122,124 @@ class Trainer:
             logger.info(
                 f"Epoch: {trainer.state.epoch} {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
             )
-            if metrics[self.metric] > self.best_metric:
-                self.best_metric = metrics[self.metric]
-                self.save_model = True
-            else:
-                self.save_model = False
 
-        from ignite.handlers import ModelCheckpoint
-
+        from ignite.handlers import ModelCheckpoint, Checkpoint
         checkpoint_handler = ModelCheckpoint(
             dirname=self.ckpt_dir,
             filename_pattern=self.ckpt_name,
             n_saved=1,
             create_dir=True,
             require_empty=False,
+            score_name=self.metric,
+            score_function=Checkpoint.get_default_score_fn(self.metric, self._metric_obj.score),
+            global_step_transform=global_step_from_engine(self.ignite_trainer)
         )
+        with self.ignite_evaluator.add_event_handler(Events.EPOCH_COMPLETED,
+                                              checkpoint_handler,
+                                                     dict(model=self.model)):
+            logger.info("Trainer Run.")
+            self.ignite_trainer.run(dl_train, self.max_epochs)
 
-        @self.ignite_trainer.on(Events.EPOCH_COMPLETED)
-        def save_best_model(trainer):
-            if self.save_model:
-                logger.info(f"Epoch: {trainer.state.epoch} save checkpoint")
-                checkpoint_handler(trainer, {"model": self.model})
-
-        logger.info("Trainer Run.")
-        self.ignite_trainer.run(dl_train, self.max_epochs)
+    def load_state_dict(self, state_dict):
+        self.model.load_state_dict(state_dict)
+        return self
 
 
-def inference(model, dl_eval):
-    all_preds = []
-    all_targets = []
+class KNN(torch.nn.Module):
+    def __init__(self,
+                 train_features:torch.Tensor,
+                 train_labels:torch.LongTensor,
+                 nb_knn: int = 10,
+                 device = 'cpu',
+                 T:float = 0.07,
+                 num_classes=50):
+        super().__init__()
+        self.device = device
+        self.train_features = normalize(train_features.T.to(self.device), dim=1, p=2)
+        self.train_labels = train_labels.view(1, -1).to(self.device)
 
-    with torch.inference_mode():
-        model.eval()
-        for batch in tqdm(dl_eval, desc="Evaluating"):
-            x, y = Trainer.decode_wds_batch(batch)
-            model.to(x.device)
-            y_pred, y = model(x, y, return_loss=False)
-            all_preds.append(y_pred)
-            all_targets.append(y)
+        self.nb_knn = nb_knn
+        self.T = T
+        self.num_classes = num_classes
 
-    all_preds = torch.cat(all_preds, dim=0)
-    all_targets = torch.cat(all_targets, dim=0)
-    return all_preds, all_targets
+    def _get_knn_sims_and_labels(self, similarity, train_labels):
+        topk_sims, indices = similarity.topk(self.nb_knn,
+                                             largest=True,
+                                             sorted=True)
+        neighbors_labels = torch.gather(train_labels, 1, indices)
+        return topk_sims, neighbors_labels
+
+
+    def compute_neighbors(self, test_data:torch.Tensor) -> tuple[Tensor, Tensor]:
+
+        similarity_rank = test_data @ self.train_features
+        candidate_labels = self.train_labels.expand(len(similarity_rank), -1)
+        return self._get_knn_sims_and_labels(similarity_rank, candidate_labels)
+
+    def forward(self, test_features: torch.Tensor):
+        test_features = normalize(test_features, dim=1, p=2)
+        topk_sims, neighbors_labels = self.compute_neighbors(test_features)
+        b = test_features.shape[0]
+        topk_sims_transform = torch.nn.functional.softmax(
+            topk_sims / self.T, 1)
+        scores = torch.nn.functional.one_hot(
+            neighbors_labels,
+            num_classes=self.num_classes) * topk_sims_transform.view(b, -1, 1)
+        return torch.sum(scores[:, :self.nb_knn, :], 1)
+
+@dataclass
+class KNNTrainer:
+    num_classes: int
+    device: torch.device | Literal['cpu'] = field(
+        default_factory=lambda: torch.device('cpu'))
+    nb_knn: int = 10
+    temperature: float = 0.07
+    metric: METRICS_TYPE = "accuracy"
+
+    def __post_init__(self):
+        self._metric_obj = ALL_METRICS[self.metric]
+        self.trainer = Engine(lambda engine, batch: prepare_wds_batch_default(batch))
+        ProgressBar(bar_format=None).attach(self.trainer)
+        # self.evaluate_engine = Engine(lambda batch:)
+        EpochOutputStore().attach(self.trainer, "output")
+
+    def train(self, dl_train, dl_eval):
+        logger.info("KNN Feature extraction run.")
+        self.trainer.run(dl_train) # Store all features in memory, should be for most cases okay
+        train_data, train_labels = zip(*self.trainer.state.output)
+        train_data, train_labels = torch.cat(train_data,
+                                             0), torch.cat(train_labels,
+                                                           0).long()
+        knn_model = KNN(train_data, train_labels, nb_knn=self.nb_knn, num_classes=self.num_classes, T= self.temperature)
+        def test_step(engine, batch):
+            x, y =  prepare_wds_batch_default(batch)
+            return knn_model(x), y
+        eval_engine = Engine(test_step)
+
+        metrics = {self.metric : self._metric_obj.metric()}
+        for name, metric in metrics.items():
+            metric.attach(eval_engine, name)
+
+        eval_engine.run(dl_eval)
+        metrics =eval_engine.state.metrics
+        logger.info(
+            f"KNN {self.metric}: {metrics[self.metric]:.3f}"
+        )
+        return metrics[self.metric]
+
+
+
+
+
+
+if __name__ == "__main__":
+    train_x = torch.randn(1000, 64)
+    targets = torch.empty(1000).random_(10).long()
+    test_x = torch.randn(100, 64)
+
+
+    model = KNN(train_x, targets, nb_knn=[10,20,50], num_classes=10)
+
+    y = model(test_x)
+    for k,v in y.items():
+        print(k, v.shape)

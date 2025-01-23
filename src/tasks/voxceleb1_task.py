@@ -1,7 +1,7 @@
 from xares.task import TaskConfig
 
 
-def voxceleb1_config(**kwargs) -> TaskConfig:
+def voxceleb1_config(encoder) -> TaskConfig:
     class_label_maps = {
         "id10003": 0,
         "id10004": 1,
@@ -1257,15 +1257,12 @@ def voxceleb1_config(**kwargs) -> TaskConfig:
     }
     config_params = {
         "name": "voxceleb1",
-        "batch_size_train": 64,
-        "learning_rate": 1e-3,
         "train_split": "voxceleb1_train",
         "test_split": "voxceleb1_test",
         "valid_split": "voxceleb1_valid",
         "zenodo_id": "TODO",
         "output_dim": len(class_label_maps),
-        "epochs": 50,
+        "encoder": encoder,
     }
-    config_params.update(kwargs)
     task_config = TaskConfig(**config_params)
     return task_config
