@@ -58,6 +58,7 @@ def attr_from_py_path(path: str, endswith: str | None = None) -> type:
     except ModuleNotFoundError:
         raise ValueError(f"Module not found: {module_name}")
 
+    print(dir(module))
     attr_list = [m for m in dir(module) if not endswith or m.endswith(endswith)]
     if len(attr_list) != 1:
         raise ValueError(f"Expected 1 class with endswith={endswith}, got {len(attr_list)}")

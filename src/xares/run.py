@@ -1,5 +1,4 @@
 import argparse
-import glob
 from functools import partial
 
 import pandas as pd
@@ -29,11 +28,15 @@ def scoring(encoder_py: str, task_py: str, do_encode: bool = True, do_mlp: bool 
     mlp_score = task.run_mlp() if do_mlp else 0
 
     logger.info(f"MLP score of {config.name}: {mlp_score}")
+    logger.info(f"Running KNN for task {config.name}...")
+    knn_score = task.run_knn() if do_mlp else 0
+
+    logger.info(f"KNN score of {config.name}: {knn_score}")
     return mlp_score
 
 
 def main(args):
-    task_files = glob.glob(args.tasks_py)
+    task_files = args.tasks_py
     single_worker_scoring = partial(scoring, num_encoder_workers=0, num_training_workers=0, num_validation_workers=0)
     stage_1 = partial(single_worker_scoring, do_encode=True, do_mlp=False)
     stage_2 = partial(single_worker_scoring, do_encode=False, do_mlp=True)
@@ -68,7 +71,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run a task")
     parser.add_argument("encoder_py", type=str, help="Encoder path. eg: example/dasheng/dasheng_encoder.py")
     parser.add_argument(
-        "tasks_py", type=str, help='Tasks path. eg: "src/tasks/*.py", note that the path should be quoted.'
+        "tasks_py", type=str, help='Tasks path. eg: src/tasks/*.py', nargs="+",
     )
     parser.add_argument("--max-jobs", type=int, default=1, help="Maximum number of concurrent tasks.")
     args = parser.parse_args()

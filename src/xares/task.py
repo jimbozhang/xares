@@ -4,11 +4,9 @@ import io
 import logging
 import json
 import sys
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal
-from accelerate import Accelerator
 
 import numpy as np
 import torch
@@ -120,7 +118,7 @@ class XaresTask:
             ]
         )
 
-        self.config = config or TaskConfig()
+        self.config = config or TaskConfig(encoder=encoder)
         self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.encoder = encoder.to(self.encoder_device)
         self.mlp = None
@@ -304,7 +302,42 @@ class XaresTask:
             # logger.info(f"{k}: {v}")
         return result
 
-    def run_knn(self, train_url, eval_url):
+
+    def run_knn(self):
+        if self.config.k_fold_splits:
+            # K-fold cross validation
+            score = []
+            splits = self._make_splits()
+            wds_encoded_training_fold_k = {
+                k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
+            }
+
+            for k in splits:
+                score.append(
+                self.train_knn(
+                    wds_encoded_training_fold_k[k],
+                    [self.encoded_tar_path_of_split[k].as_posix()],
+                ))
+
+            for k in range(len(splits)):
+                logger.info(f"Fold {k+1} {self.config.metric}: {score[k]}")
+
+            avg_score = np.mean(score)
+            logger.info(f"The averaged KNN {self.config.metric} of 5 folds is: {avg_score}")
+
+            return avg_score
+
+        else:
+            # Single split
+            score = self.train_knn(
+                [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
+                [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
+            )
+            logger.info(f"The KNN score: {score}")
+            score = score
+            return score
+
+    def train_knn(self, train_url, eval_url):
         dl_train = create_embedding_webdataset(
             train_url,
             tar_shuffle=2000,
@@ -324,6 +357,13 @@ class XaresTask:
         scores = knn_trainer.train(dl_train, dl_eval)
         return scores
 
+    def run(self):
+        self.make_encoded_tar()
+        mlp_score = self.run_mlp()
+        knn_score = self.run_knn()
+        return mlp_score, knn_score
+
+        
 
     def _make_splits(self):
         splits = self.config.k_fold_splits or [self.config.train_split, self.config.valid_split, self.config.test_split]

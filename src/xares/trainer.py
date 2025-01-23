@@ -159,20 +159,9 @@ class KNN(torch.nn.Module):
         self.train_features = normalize(train_features.T.to(self.device), dim=1, p=2)
         self.train_labels = train_labels.view(1, -1).to(self.device)
 
-<<<<<<< HEAD
         self.nb_knn = nb_knn
         self.T = T
         self.num_classes = num_classes
-=======
-    with torch.inference_mode():
-        model.eval()
-        for batch in tqdm(dl_eval, desc="Evaluating"):
-            x, y = Trainer.decode_wds_batch(batch)
-            model.to(x.device)
-            y_pred, y = model(x, y, return_loss=False)
-            all_preds.append(y_pred)
-            all_targets.append(y)
->>>>>>> 53588ed8f792bc241fd9fe36c52dd4443ea44f3d
 
     def _get_knn_sims_and_labels(self, similarity, train_labels):
         topk_sims, indices = similarity.topk(self.nb_knn,
