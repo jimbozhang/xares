@@ -28,7 +28,7 @@ authors = [
   {name = "Chenyu Liu", email = "liuchenyu3@xiaomi.com"},
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 
 [project.urls]

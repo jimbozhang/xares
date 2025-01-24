@@ -260,7 +260,7 @@ def fluentspeechcommands_config(encoder) -> TaskConfig:
         "train_split": "fluentspeechcommands_train",
         "valid_split": "fluentspeechcommands_valid",
         "test_split": "fluentspeechcommands_test",
-        "zenodo_id": "TODO",
+        "zenodo_id": "14722453",
         "output_dim": len(class_label_maps),
         "label_processor": lambda x: class_label_maps[x[data_key]],
     }

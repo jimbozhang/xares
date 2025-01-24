@@ -17,7 +17,7 @@ def gtzan_genre_config(encoder) -> TaskConfig:
     config_params = {
         "encoder": encoder,
         "name": "gtzan_genre",
-        "zenodo_id": "TODO",
+        "zenodo_id": "14722472",
         "k_fold_splits": list(range(0, 10)),
         "output_dim": len(class_label_maps),
         "label_processor": lambda x: class_label_maps[x["genre"]],

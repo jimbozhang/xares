@@ -47,7 +47,7 @@ def voxlingua33_config(encoder) -> TaskConfig:
             "train_split": "train_subset",
             "test_split": "dev",
             "valid_split": "dev",
-            "zenodo_id": "TODO",
+            "zenodo_id": "14723799",
             "output_dim": len(class_label_maps),
             "epochs": 50,
             "batch_size_encode": 64,

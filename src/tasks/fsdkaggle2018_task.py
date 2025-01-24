@@ -55,7 +55,7 @@ def fsdkaggle2018_config(encoder) -> TaskConfig:
         "train_split": "fsd18_train",
         "test_split": "fsd18_test",
         "valid_split": "fsd18_test",
-        "zenodo_id": "TODO",
+        "zenodo_id": "14725117",
         "output_dim": len(class_label_maps),
         "label_processor": lambda x: class_label_maps[x[data_key]],
         "epochs": 20,

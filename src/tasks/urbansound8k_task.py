@@ -17,7 +17,7 @@ def urbansound8k_config(encoder) -> TaskConfig:
     config_params = {
         "encoder": encoder,
         "name": "urbansound8k",
-        "zenodo_id": "TODO",
+        "zenodo_id": "14722683",
         "k_fold_splits": list(range(1, 11)),
         "output_dim": len(class_label_maps),
         "label_processor": lambda x: class_label_maps[x["soundevent"]],
