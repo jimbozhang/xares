@@ -44,7 +44,7 @@ def speechcommandsv1_config(encoder) -> TaskConfig:
         "train_split": "wds-audio-train",
         "valid_split": "wds-audio-valid",
         "test_split": "wds-audio-test",
-        "zenodo_id": "TODO",
+        "zenodo_id": "14722647",
         "output_dim": len(class_label_maps),
         "label_processor": lambda x: class_label_maps[x[data_key]],
         "epochs": 50,

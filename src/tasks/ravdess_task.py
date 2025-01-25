@@ -16,7 +16,7 @@ def ravdess_config(encoder) -> TaskConfig:
     config_params = {
         "name": "ravdess",
         "encoder": encoder,
-        "zenodo_id": "TODO",
+        "zenodo_id": "14722524",
         "k_fold_splits": list(range(0, 4)),
         "output_dim": len(class_label_maps),
         "label_processor": lambda x: class_label_maps[x["emotion"]],

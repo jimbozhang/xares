@@ -5,7 +5,7 @@ def librispeech_male_female_config(encoder) -> TaskConfig:
     config_params = {
         "name": "librispeechmalefemale",
         "encoder": encoder,
-        "zenodo_id": "14641593",
+        "zenodo_id": "14716252",
         "output_dim": 2,
         "train_split": "train-clean-100",
         "valid_split": "dev-clean",

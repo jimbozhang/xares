@@ -7,7 +7,7 @@ def libricount_config(encoder) -> TaskConfig:
     config_params = {
         "encoder": encoder,
         "name": "libricount",
-        "zenodo_id": "TODO",
+        "zenodo_id": "14722478",
         "learning_rate": 1e-3,
         "batch_size_train": 64,
         "k_fold_splits": list(range(0, 5)),

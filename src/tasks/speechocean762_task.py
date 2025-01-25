@@ -8,7 +8,7 @@ def speechocean762_config(encoder, **kwargs) -> TaskConfig:
         train_split="speechocean762_train",
         valid_split="speechocean762_test",
         test_split="speechocean762_test",
-        zenodo_id="TODO",
+        zenodo_id="14725291",
         output_dim=1,
         metric="MSE",
         criterion="MSELoss",

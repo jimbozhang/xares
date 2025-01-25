@@ -5,7 +5,7 @@ def vocalsound_config(encoder) -> TaskConfig:
     config_params = {
         "name": "vocalsound",
         "encoder": encoder,
-        "zenodo_id": "TODO",
+        "zenodo_id": "14722710",
         "output_dim": 6,
         "label_processor": lambda x: {
             "laughter": 0,

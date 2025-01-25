@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Literal
 
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 import torch.nn as nn
 import webdataset as wds
 from loguru import logger
@@ -167,7 +168,11 @@ class XaresTask:
                 [audio_tar_path_of_split[split]],
                 target_sample_rate=self.encoder.sampling_rate,
                 audio_key_name="audio",
-                num_workers=self.config.num_encoder_workers,
+                num_workers=(
+                    0
+                    if (mp.current_process().daemon or mp.get_start_method() != "fork")
+                    else self.config.num_encoder_workers
+                ),
                 batch_size=self.config.batch_size_encode,
                 crop_length=self.config.crop_length,
                 pad_last=True,  # Add crop

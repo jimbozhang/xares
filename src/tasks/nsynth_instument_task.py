@@ -22,7 +22,7 @@ def nysnthinstument_config(encoder) -> TaskConfig:
         train_split="nsynth_train",
         test_split="nsynth_test",
         valid_split="nsynth_valid",
-        zenodo_id="TODO",
+        zenodo_id="14725174",
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x[data_key]],
     )
