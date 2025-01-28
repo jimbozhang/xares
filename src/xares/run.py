@@ -8,7 +8,7 @@ from loguru import logger
 
 from xares.audio_encoder_checker import check_audio_encoder
 from xares.task import XaresTask
-from xares.utils import attr_from_py_path
+from xares.utils import attr_from_py_path, download_zenodo_record
 
 
 def scoring(encoder_py: str, task_py: str, do_encode: bool = True, do_mlp: bool = True, **kwargs):
@@ -18,6 +18,7 @@ def scoring(encoder_py: str, task_py: str, do_encode: bool = True, do_mlp: bool 
 
     # Task setup
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
+    config.force_download = False  # The dataset has already been downloaded in stage 0
     task = XaresTask(config=config)
 
     # Run the task
@@ -46,11 +47,21 @@ def main(args):
     def stage_2_return_dict(encoder_py, task_py, return_dict):
         return_dict[task_py] = stage_2(encoder_py, task_py)
 
-    # Step 1: Execute make_encoded_tar
+    # Stage 0: Download all datasets
+    configs = [attr_from_py_path(task_py, endswith="_config")(None) for task_py in task_files]
+    with mp.Pool(processes=args.max_jobs) as pool:
+        pool.starmap(
+            download_zenodo_record,
+            [(c.zenodo_id, f"{c.env_root}/{c.name}", args.force_download) for c in configs if c.zenodo_id],
+        )
+    logger.info("Step 0 completed: All datasets downloaded.")
+
+    # Stage 1: Execute make_encoded_tar
     with mp.Pool(processes=args.max_jobs) as pool:
         pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in task_files])
+    logger.info("Step 1 completed: All tasks encoded.")
 
-    # Step 2: Execute mlp scoring
+    # Stage 2: Execute mlp scoring
     manager = mp.Manager()
     return_dict = manager.dict()
     with mp.Pool(processes=args.max_jobs) as pool:
@@ -58,6 +69,7 @@ def main(args):
             stage_2_return_dict,
             [(args.encoder_py, task_py, return_dict) for task_py in task_files],
         )
+    logger.info("Step 2 completed: All tasks scored.")
 
     # Output results in a table and calculate the average value
     df = pd.DataFrame(return_dict.items(), columns=["Task", "Value"])
@@ -77,5 +89,6 @@ if __name__ == "__main__":
         nargs="+",
     )
     parser.add_argument("--max-jobs", type=int, default=1, help="Maximum number of concurrent tasks.")
+    parser.add_argument("--force-download", action="store_true", help="Force download the dataset.")
     args = parser.parse_args()
     main(args)
