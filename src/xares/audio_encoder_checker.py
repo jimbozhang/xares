@@ -42,5 +42,4 @@ def check_audio_encoder(encoder: torch.nn.Module):
         logger.error(f"Expected output_dim={encoder.output_dim} for encoded_audio, got {encoded_audio.size(2)}")
         return False
 
-    logger.info("Encoder check passed.")
     return True

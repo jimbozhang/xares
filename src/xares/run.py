@@ -8,68 +8,82 @@ from loguru import logger
 
 from xares.audio_encoder_checker import check_audio_encoder
 from xares.task import XaresTask
-from xares.utils import attr_from_py_path, download_zenodo_record
+from xares.utils import attr_from_py_path
 
 
-def scoring(encoder_py: str, task_py: str, do_encode: bool = True, do_mlp: bool = True, **kwargs):
+def worker(
+    encoder_py: str,
+    task_py: str,
+    do_download: bool = False,
+    do_encode: bool = False,
+    do_mlp: bool = False,
+    do_knn: bool = False,
+):
     # Encoder setup
     encoder = attr_from_py_path(encoder_py, endswith="Encoder")()
     assert check_audio_encoder(encoder), "Invalid encoder"
 
     # Task setup
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
-    config.force_download = False  # The dataset has already been downloaded in stage 0
     task = XaresTask(config=config)
 
     # Run the task
-    logger.info(f"Running make_encoded_tar for task {config.name}...")
-    do_encode and task.make_encoded_tar()
+    if do_download:
+        logger.info(f"Downloading data for task {config.name} ...")
+        task.download_audio_tar()
+        logger.info(f"Data downloaded for task {config.name}.")
 
-    logger.info(f"Running run_mlp for task {config.name}...")
-    mlp_score = task.run_mlp() if do_mlp else 0
+    if do_encode:
+        logger.info(f"Running make_encoded_tar for task {config.name} ...")
+        task.make_encoded_tar()
+        logger.info(f"Encoded tar created for task {config.name}.")
 
-    logger.info(f"MLP score of {config.name}: {mlp_score}")
-    logger.info(f"Running KNN for task {config.name}...")
-    knn_score = task.run_knn() if do_mlp else 0
+    mlp_score = 0
+    if do_mlp:
+        logger.info(f"Running run_mlp for task {config.name} ...")
+        mlp_score = task.run_mlp()
+        logger.info(f"MLP score of {config.name}: {mlp_score}")
 
-    logger.info(f"KNN score of {config.name}: {knn_score}")
-    return mlp_score
+    knn_score = 0
+    if do_knn:
+        logger.info(f"Running KNN for task {config.name} ...")
+        knn_score = task.run_knn()
+        logger.info(f"KNN score of {config.name}: {knn_score}")
+
+    return mlp_score, knn_score
 
 
 def main(args):
     task_files = args.tasks_py
-    single_worker_scoring = partial(scoring, num_encoder_workers=0, num_training_workers=0, num_validation_workers=0)
-    stage_1 = partial(single_worker_scoring, do_encode=True, do_mlp=False)
-    stage_2 = partial(single_worker_scoring, do_encode=False, do_mlp=True)
-
     torch.multiprocessing.set_start_method("spawn")
 
-    def stage_2_return_dict(encoder_py, task_py, return_dict):
-        return_dict[task_py] = stage_2(encoder_py, task_py)
-
     # Stage 0: Download all datasets
-    configs = [attr_from_py_path(task_py, endswith="_config")(None) for task_py in task_files]
-    with mp.Pool(processes=args.max_jobs) as pool:
-        pool.starmap(
-            download_zenodo_record,
-            [(c.zenodo_id, f"{c.env_root}/{c.name}", args.force_download) for c in configs if c.zenodo_id],
-        )
-    logger.info("Step 0 completed: All datasets downloaded.")
+    stage_0 = partial(worker, do_download=True)
+    if args.first_stage <= 0:
+        with mp.Pool(processes=args.max_jobs) as pool:
+            pool.starmap(stage_0, [(args.encoder_py, task_py) for task_py in task_files])
+        logger.info("Stage 0 completed: All data downloaded.")
 
     # Stage 1: Execute make_encoded_tar
-    with mp.Pool(processes=args.max_jobs) as pool:
-        pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in task_files])
-    logger.info("Step 1 completed: All tasks encoded.")
+    stage_1 = partial(worker, do_encode=True)
+    if args.first_stage <= 1:
+        with mp.Pool(processes=args.max_jobs) as pool:
+            pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in task_files])
+        logger.info("Stage 1 completed: All tasks encoded.")
 
-    # Stage 2: Execute mlp scoring
-    manager = mp.Manager()
-    return_dict = manager.dict()
-    with mp.Pool(processes=args.max_jobs) as pool:
-        pool.starmap(
-            stage_2_return_dict,
-            [(args.encoder_py, task_py, return_dict) for task_py in task_files],
-        )
-    logger.info("Step 2 completed: All tasks scored.")
+    # Stage 2: Execute mlp and knn scoring
+    stage_2 = lambda encoder_py, task_py, result: result.update(
+        {task_py: worker(encoder_py, task_py, do_mlp=True, do_knn=True)}
+    )
+    if args.first_stage <= 2:
+        manager = mp.Manager()
+        return_dict = manager.dict()
+        with mp.Pool(processes=args.max_jobs) as pool:
+            pool.starmap(
+                stage_2,
+                [(args.encoder_py, task_py, return_dict) for task_py in task_files],
+            )
+        logger.info("Stage 2 completed: All tasks scored.")
 
     # Output results in a table and calculate the average value
     df = pd.DataFrame(return_dict.items(), columns=["Task", "Value"])
@@ -89,6 +103,6 @@ if __name__ == "__main__":
         nargs="+",
     )
     parser.add_argument("--max-jobs", type=int, default=1, help="Maximum number of concurrent tasks.")
-    parser.add_argument("--force-download", action="store_true", help="Force download the dataset.")
+    parser.add_argument("--first-stage", default=0, type=int, help="First stage to run.")
     args = parser.parse_args()
     main(args)

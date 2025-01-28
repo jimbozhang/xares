@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import io
 import json
-import logging
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal
@@ -44,7 +42,6 @@ class TaskConfig:
 
     # Audio tar
     force_download: bool = False
-    force_generate_audio_tar: bool = False
     audio_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     num_shards_rawaudio = 4
     zenodo_id: str | None = None
@@ -104,20 +101,10 @@ class TaskConfig:
 
 class XaresTask:
     def __init__(self, config: TaskConfig):
-        logging.captureWarnings(True)
-        logging.getLogger("py.warnings").setLevel(logging.ERROR)
-        # Make the logger with this format the default for all loggers in this package
-        logger.configure(
-            handlers=[
-                {
-                    "sink": sys.stdout,
-                    "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
-                    "level": "DEBUG",
-                }
-            ]
-        )
-
         self.config = config
+        if self.config.encoder is None:
+            raise ValueError("Encoder must be provided in the config.")
+
         self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.encoder = self.config.encoder.to(self.encoder_device)
         self.mlp = None
@@ -137,6 +124,15 @@ class XaresTask:
             self.config.train_split = self.config.valid_split = self.config.test_split = None
 
         self.label_processor = self.config.label_processor
+
+    def download_audio_tar(self):
+        audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
+        if not self.config.force_download and audio_ready_path.exists():
+            logger.info(f"Skip downloading audio tar: {audio_ready_path} exists.")
+            return
+
+        download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
+        audio_ready_path.touch()
 
     def make_encoded_tar(self):
         self.encoded_tar_path_of_split = {
