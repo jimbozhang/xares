@@ -19,9 +19,9 @@ def nysnthinstument_config(encoder) -> TaskConfig:
     return TaskConfig(
         name="nsynthinstument",
         encoder=encoder,
-        train_split="nsynth_train",
-        test_split="nsynth_test",
-        valid_split="nsynth_valid",
+        train_split="train",
+        test_split="test",
+        valid_split="valid",
         zenodo_id="14725174",
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x[data_key]],
