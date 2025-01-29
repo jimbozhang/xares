@@ -58,6 +58,10 @@ def worker(
     return mlp_score, knn_score
 
 
+def stage_2(encoder_py, task_py, result: dict):
+    result.update({task_py: worker(encoder_py, task_py, do_mlp=True, do_knn=True)})
+
+
 def main(args):
     setup_global_logger()
     torch.multiprocessing.set_start_method("spawn")
@@ -75,7 +79,7 @@ def main(args):
 
     # Stage 1: Execute make_encoded_tar
     stage_1 = partial(worker, do_encode=True)
-    if args.from_stage <= 1:
+    if args.from_stage <= 1 and args.to_stage >= 1:
         try:
             with mp.Pool(processes=args.max_jobs) as pool:
                 pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in args.tasks_py])
@@ -85,25 +89,27 @@ def main(args):
             raise e
 
     # Stage 2: Execute mlp and knn scoring
-    stage_2 = lambda encoder_py, task_py, result: result.update(
-        {task_py: worker(encoder_py, task_py, do_mlp=True, do_knn=True)}
-    )
-    if args.from_stage <= 2:
+    if args.from_stage <= 2 and args.to_stage >= 2:
         manager = mp.Manager()
         return_dict = manager.dict()
         with mp.Pool(processes=args.max_jobs) as pool:
             pool.starmap(
-                stage_2,
-                [(args.encoder_py, task_py, return_dict) for task_py in args.tasks_py],
+                partial(stage_2, result=return_dict),
+                [(args.encoder_py, task_py) for task_py in args.tasks_py],
             )
-        logger.info("Stage 2 completed: All tasks scored.")
+        logger.info("Scoring completed: All tasks scored.")
 
-    # Output results in a table and calculate the average value
-    df = pd.DataFrame(return_dict.items(), columns=["Task", "Value"])
-    df["Task"] = df["Task"].str.replace(r".*\.", "", regex=True).str.replace(r"_task$", "", regex=True)
+        # Print results
+        df = pd.DataFrame(return_dict.items(), columns=["Task", "Scores"])
+        df["MLP_Score"] = df["Scores"].apply(lambda x: x[0])
+        df["KNN_Score"] = df["Scores"].apply(lambda x: x[1])
+        df["Task"] = df["Task"].str.replace(r".*/", "", regex=True).str.strip("_task.py")
+        df.drop(columns=["Scores"], inplace=True)
+        df.sort_values(by="Task", inplace=True)
 
-    print(f"\nMLP result: \n{df}")
-    print("\nAverage Value:", df["Value"].mean())
+        print(f"\nResults: \n{df}")
+        print("\nAverage MLP Score:", df["MLP_Score"].mean())
+        print("Average KNN Score:", df["KNN_Score"].mean())
 
 
 if __name__ == "__main__":
@@ -117,5 +123,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--max-jobs", type=int, default=1, help="Maximum number of concurrent tasks.")
     parser.add_argument("--from-stage", default=0, type=int, help="First stage to run.")
+    parser.add_argument("--to-stage", default=2, type=int, help="Last stage to run.")
     args = parser.parse_args()
     main(args)

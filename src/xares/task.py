@@ -125,6 +125,11 @@ class XaresTask:
 
         self.label_processor = self.config.label_processor
 
+        self.encoded_tar_path_of_split = {
+            split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
+            for split in self.config.encoded_tar_name_of_split
+        }
+
     def download_audio_tar(self):
         if self.config.private:
             logger.warning(f"Dataset {self.config.name} is private. Do not download from Zenodo.")
@@ -139,11 +144,6 @@ class XaresTask:
         audio_ready_path.touch()
 
     def make_encoded_tar(self):
-        self.encoded_tar_path_of_split = {
-            split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
-            for split in self.config.encoded_tar_name_of_split
-        }
-
         encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
         if not self.config.force_encode and encoded_ready_path.exists():
             logger.warning(f"Skip encoding: {encoded_ready_path} exists.")
