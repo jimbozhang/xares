@@ -39,7 +39,7 @@ def worker(
         task.make_encoded_tar()
         logger.info(f"Task {config.name} encoded.")
 
-    if not (task.encoded_tar_dir / task.config.xares_settings.encoded_ready_filename).exists():
+    if config.private and not (task.encoded_tar_dir / task.config.xares_settings.encoded_ready_filename).exists():
         logger.warning(f"Task {config.name} is private and not ready, skipping.")
         do_mlp = do_knn = False
 
