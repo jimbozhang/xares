@@ -31,12 +31,16 @@ def worker(
     if do_download:
         logger.info(f"Downloading data for task {config.name} ...")
         task.download_audio_tar()
-        logger.info(f"Data downloaded for task {config.name}.")
+        logger.info(f"Task {config.name} data ready.")
 
     if do_encode:
         logger.info(f"Running make_encoded_tar for task {config.name} ...")
         task.make_encoded_tar()
-        logger.info(f"Encoded tar created for task {config.name}.")
+        logger.info(f"Task {config.name} encoded.")
+
+    if not (task.encoded_tar_dir / task.config.xares_settings.encoded_ready_filename).exists():
+        logger.info(f"Task {config.name} is private and not ready, skipping.")
+        do_mlp = do_knn = False
 
     mlp_score = 0
     if do_mlp:
@@ -54,22 +58,29 @@ def worker(
 
 
 def main(args):
-    task_files = args.tasks_py
     torch.multiprocessing.set_start_method("spawn")
 
     # Stage 0: Download all datasets
     stage_0 = partial(worker, do_download=True)
     if args.first_stage <= 0:
-        with mp.Pool(processes=args.max_jobs) as pool:
-            pool.starmap(stage_0, [(args.encoder_py, task_py) for task_py in task_files])
-        logger.info("Stage 0 completed: All data downloaded.")
+        try:
+            with mp.Pool(processes=args.max_jobs) as pool:
+                pool.starmap(stage_0, [(args.encoder_py, task_py) for task_py in args.tasks_py])
+            logger.info("Stage 0 completed: All data downloaded.")
+        except Exception as e:
+            logger.error(f"Error in stage 0 (download): {e}. Must fix it before proceeding.")
+            raise e
 
     # Stage 1: Execute make_encoded_tar
     stage_1 = partial(worker, do_encode=True)
     if args.first_stage <= 1:
-        with mp.Pool(processes=args.max_jobs) as pool:
-            pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in task_files])
-        logger.info("Stage 1 completed: All tasks encoded.")
+        try:
+            with mp.Pool(processes=args.max_jobs) as pool:
+                pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in args.tasks_py])
+            logger.info("Stage 1 completed: All tasks encoded.")
+        except Exception as e:
+            logger.error(f"Error in stage 1 (encode): {e}. Must fix it before proceeding.")
+            raise e
 
     # Stage 2: Execute mlp and knn scoring
     stage_2 = lambda encoder_py, task_py, result: result.update(
@@ -81,7 +92,7 @@ def main(args):
         with mp.Pool(processes=args.max_jobs) as pool:
             pool.starmap(
                 stage_2,
-                [(args.encoder_py, task_py, return_dict) for task_py in task_files],
+                [(args.encoder_py, task_py, return_dict) for task_py in args.tasks_py],
             )
         logger.info("Stage 2 completed: All tasks scored.")
 

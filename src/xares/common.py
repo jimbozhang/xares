@@ -20,8 +20,12 @@ class XaresSettings:
             handlers=[
                 {
                     "sink": sys.stdout,
-                    "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
+                    "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] "
+                    "<level>{message}</level>",
                     "level": "DEBUG",
+                    "colorize": True,
                 }
             ]
         )
+        logger.level("ERROR", color="<red>")
+        logger.level("INFO", color="<white>")

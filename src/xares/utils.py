@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from loguru import logger
+from tqdm import tqdm
 
 
 def mkdir_if_not_exists(dir: Path, main_process: bool = True):
@@ -10,11 +11,32 @@ def mkdir_if_not_exists(dir: Path, main_process: bool = True):
         dir.mkdir(parents=True, exist_ok=True)
 
 
-def download_file(url, filename):
-    import urllib.request
+def download_file(url, target_path, chunk_size=8192):
+    import requests
 
-    logger.info(f"Downloading {url} to {filename} ...")
-    urllib.request.urlretrieve(url, filename)
+    target_path = Path(target_path) if isinstance(target_path, str) else target_path
+    existing_size = target_path.stat().st_size if target_path.exists() else 0
+    headers = {"Range": f"bytes={existing_size}-"}
+
+    with requests.get(url, headers=headers, stream=True) as r:
+        total_size = int(r.headers.get("content-length", 0)) + existing_size
+        with (
+            open(target_path, "ab") as f,
+            tqdm(
+                total=total_size,
+                unit="iB",
+                unit_scale=True,
+                desc=f"Downloading {target_path.name}",
+                leave=True,
+                initial=existing_size,
+            ) as pbar,
+        ):
+            for chunk in r.iter_content(chunk_size):
+                size = f.write(chunk)
+                pbar.update(size)
+
+    pbar.set_description(f"Downloaded {target_path.name} ({total_size} bytes)")
+    print()  # Add a newline after tqdm
 
 
 def unzip_file(zip_file, dest_dir):
@@ -43,7 +65,7 @@ def download_zenodo_record(zenodo_id: str, target_dir: str, force_download: bool
 
     target_zip_path = Path(target_dir) / f"{zenodo_id}.zip"
     if not force_download and target_zip_path.exists():
-        logger.info(f"{target_dir}/{zenodo_id}.zip already exists, skipping download.")
+        logger.info(f"{target_zip_path} already exists, skipping download.")
     else:
         temp_zip_path = Path(tempfile.gettempdir()) / f"{zenodo_id}.zip"
         zenodo_archive_url = f"https://zenodo.org/api/records/{zenodo_id}/files-archive"
@@ -59,8 +81,8 @@ def download_zenodo_record(zenodo_id: str, target_dir: str, force_download: bool
         else:
             logger.info(f"{target_zip_path} already unzipped, skipping unzip.")
     except Exception as e:
-        err_msg = f"Failed to unzip {target_zip_path} to {target_dir}: {e}, try to remove {target_zip_path} and retry."
-        logger.error(err_msg)
+        logger.error(f"Failed to unzip {target_zip_path} to {target_dir}: {e}.")
+        logger.error(f"Remove {target_zip_path} and retry, or download manually using `download_data.sh`.")
         raise e
 
 

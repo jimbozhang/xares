@@ -126,6 +126,10 @@ class XaresTask:
         self.label_processor = self.config.label_processor
 
     def download_audio_tar(self):
+        if self.config.private:
+            logger.info(f"Dataset {self.config.name} is private. Do not download from Zenodo.")
+            return
+
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
         if not self.config.force_download and audio_ready_path.exists():
             logger.info(f"Skip downloading audio tar: {audio_ready_path} exists.")
@@ -182,7 +186,7 @@ class XaresTask:
             )
 
             with torch.inference_mode():
-                for enum_item, ((audio, audio_length), json_data, filenames) in tqdm(
+                for enum_item, ((audio, _), json_data, filenames) in tqdm(
                     enumerate(dl), desc=f"Encoding {split}", leave=True
                 ):
                     audio = audio.to(self.encoder_device)
@@ -354,6 +358,7 @@ class XaresTask:
         return scores
 
     def run(self):
+        self.download_audio_tar()
         self.make_encoded_tar()
         mlp_score = self.run_mlp()
         knn_score = self.run_knn()

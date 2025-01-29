@@ -20,7 +20,7 @@ X-ARES is a toolkit for training, evaluating, and exporting audio encoders for v
 - [x] CREMA-D
 - [x] RAVDESS
 - [ ] LibriSpeech-Phoneme
-- [ ] speechocean762
+- [x] speechocean762
 - [x] ASV2015
 
 ### Environment
@@ -29,15 +29,15 @@ X-ARES is a toolkit for training, evaluating, and exporting audio encoders for v
 - [ ] FSD50k
 - [x] UrbanSound 8k
 - [ ] DESED
-- [ ] FSD18-Kaggle
+- [x] FSD18-Kaggle
 - [x] Clotho
 
 ### Music
 
 - [ ] MAESTRO
 - [x] GTZAN Genre
-- [ ] NSynth
-- [ ] FMA
+- [x] NSynth
+- [x] FMA
 
 ## Installation
 
@@ -57,25 +57,29 @@ pip install -e .[examples]
 
 ## Run with the baseline pretrained audio encoder (Dasheng)
 
+You can run the benchmark with the baseline pretrained audio encoder (Dasheng) with 8 parallel jobs using the following command:
+
 ```bash
 python -m xares.run --max-jobs 8 example/dasheng/dasheng_encoder.py src/tasks/*.py
 ```
 
-Or from inside python:
+It will download the datasets from [Zenodo](https://zenodo.org/communities/mispeech/records), and then evaluate the encoder on all the tasks.
+If the automatic download fails, you can also manually download the datasets using `tools/download_manually.sh`.
+
+Alternatively, you can run tasks from within Python. Here is an example of running the ASVspoof2015 task in a single process:
 
 ```python
-from xares.task import XaresTask
-from example.dasheng.dasheng_encoder import DashengEncoder
-from tasks.asvspoof_task import asvspoof2015_config
-task = XaresTask(encoder=DashengEncoder(), config=asvspoof2015_config())
-task.run()
+>>> from example.dasheng.dasheng_encoder import DashengEncoder
+>>> from tasks.asvspoof_task import asvspoof2015_config
+>>> from xares.task import XaresTask
+
+>>> task = XaresTask(encoder=DashengEncoder(), config=asvspoof2015_config())
+>>> task.run()
 ```
-
-
 
 ## Run with your own pretrained audio encoder
 
-An example of audio encoder wrapper could be found at `example/dasheng/dasheng_encoder.py` and `example/wav2vec2/wav2vec2.py`.
+Two examples of audio encoder wrapper could be found at `example/dasheng/dasheng_encoder.py` and `example/wav2vec2/wav2vec2.py`.
 
 We provide a check function to verify if the encoder is correctly implemented:
 
@@ -93,6 +97,7 @@ And then you can run the benchmark with your own encoder:
 python -m xares.run --max-jobs 8 your_encoder.py src/tasks/*.py
 ```
 
-## Add your own task
+## Add new tasks
 
-To add a new task, refer to the existing task implementations for guidance. You need to create a TaskConfig tailored to your chosen dataset.
+Adding a new task is easy. Refer to the existing task implementations for guidance.
+You need to create a `TaskConfig` tailored to your chosen dataset.
