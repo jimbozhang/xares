@@ -3,7 +3,7 @@ from xares.task import TaskConfig
 
 def speechocean762_config(encoder) -> TaskConfig:
     data_key = "accuracy"
-    task_config = TaskConfig(
+    return TaskConfig(
         name="speechocean762",
         encoder=encoder,
         train_split="speechocean762_train",
@@ -17,4 +17,3 @@ def speechocean762_config(encoder) -> TaskConfig:
         label_processor=lambda x: float(x[data_key]),
         epochs=25,
     )
-    return task_config

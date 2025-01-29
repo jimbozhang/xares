@@ -46,21 +46,16 @@ def fsdkaggle2018_config(encoder) -> TaskConfig:
         "Violin_or_fiddle": 39,
         "Finger_snapping": 40,
     }
-
-    config_params = {
-        "name": "fsdkaggle2018",
-        "encoder": encoder,
-        "batch_size_train": 64,
-        "learning_rate": 1e-3,
-        "train_split": "fsd18_train",
-        "test_split": "fsd18_test",
-        "valid_split": "fsd18_test",
-        "zenodo_id": "14725117",
-        "output_dim": len(class_label_maps),
-        "label_processor": lambda x: class_label_maps[x[data_key]],
-        "epochs": 20,
-    }
-
-    config = TaskConfig(**config_params)
-
-    return config
+    return TaskConfig(
+        name="fsdkaggle2018",
+        encoder=encoder,
+        batch_size_train=64,
+        learning_rate=1e-3,
+        train_split="fsd18_train",
+        test_split="fsd18_test",
+        valid_split="fsd18_test",
+        zenodo_id="14725117",
+        output_dim=len(class_label_maps),
+        label_processor=lambda x: class_label_maps[x[data_key]],
+        epochs=20,
+    )

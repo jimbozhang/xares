@@ -1255,14 +1255,12 @@ def voxceleb1_config(encoder) -> TaskConfig:
         "id11250": 1249,
         "id11251": 1250,
     }
-    config_params = {
-        "name": "voxceleb1",
-        "train_split": "voxceleb1_train",
-        "test_split": "voxceleb1_test",
-        "valid_split": "voxceleb1_valid",
-        "zenodo_id": "14725363",
-        "output_dim": len(class_label_maps),
-        "encoder": encoder,
-    }
-    task_config = TaskConfig(**config_params)
-    return task_config
+    return TaskConfig(
+        name="voxceleb1",
+        train_split="voxceleb1_train",
+        test_split="voxceleb1_test",
+        valid_split="voxceleb1_valid",
+        zenodo_id="14725363",
+        output_dim=len(class_label_maps),
+        encoder=encoder,
+    )

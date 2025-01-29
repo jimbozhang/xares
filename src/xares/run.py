@@ -76,20 +76,13 @@ def main(args):
     # Stage 1: Execute make_encoded_tar
     stage_1 = partial(worker, do_encode=True)
     if args.from_stage <= 1:
-        max_jobs = args.max_jobs
-        while True:
-            try:
-                with mp.Pool(processes=max_jobs) as pool:
-                    pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in args.tasks_py])
-                logger.info("Stage 1 completed: All tasks encoded.")
-                break
-            except RuntimeError as e:
-                if "CUDA out of memory" in str(e) and max_jobs > 1:
-                    logger.warning("CUDA out of memory, decreasing job number and retrying ...")
-                    max_jobs = max(1, max_jobs - 1)
-                else:
-                    logger.error(f"Error in stage 1 (encode): {e}")
-                    raise e
+        try:
+            with mp.Pool(processes=args.max_jobs) as pool:
+                pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in args.tasks_py])
+            logger.info("Stage 1 completed: All tasks encoded.")
+        except RuntimeError as e:
+            logger.error(f"Error in stage 1 (encode): {e}. Must fix it before proceeding.")
+            raise e
 
     # Stage 2: Execute mlp and knn scoring
     stage_2 = lambda encoder_py, task_py, result: result.update(

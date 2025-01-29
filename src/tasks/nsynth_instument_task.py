@@ -16,7 +16,7 @@ def nysnthinstument_config(encoder) -> TaskConfig:
         "brass": 9,
         "synth_lead": 10,
     }
-    task_config = TaskConfig(
+    return TaskConfig(
         name="nsynthinstument",
         encoder=encoder,
         train_split="nsynth_train",
@@ -26,4 +26,3 @@ def nysnthinstument_config(encoder) -> TaskConfig:
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x[data_key]],
     )
-    return task_config

@@ -38,21 +38,17 @@ def voxlingua33_config(encoder) -> TaskConfig:
         "sr": 32,
     }
 
-    task_config = TaskConfig(
-        **{
-            "name": "voxlingua33",
-            "encoder": encoder,
-            "batch_size_train": 64,
-            "learning_rate": 1e-3,
-            "train_split": "train_subset",
-            "test_split": "dev",
-            "valid_split": "dev",
-            "zenodo_id": "14723799",
-            "output_dim": len(class_label_maps),
-            "epochs": 50,
-            "batch_size_encode": 64,
-            "crop_length": 10,
-        }
+    return TaskConfig(
+        name="voxlingua33",
+        encoder=encoder,
+        batch_size_train=64,
+        learning_rate=1e-3,
+        train_split="train_subset",
+        test_split="dev",
+        valid_split="dev",
+        zenodo_id="14723799",
+        output_dim=len(class_label_maps),
+        epochs=50,
+        batch_size_encode=64,
+        crop_length=10,
     )
-
-    return task_config
