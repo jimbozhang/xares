@@ -7,6 +7,7 @@ import torch.multiprocessing as mp
 from loguru import logger
 
 from xares.audio_encoder_checker import check_audio_encoder
+from xares.common import setup_global_logger
 from xares.task import XaresTask
 from xares.utils import attr_from_py_path
 
@@ -39,7 +40,7 @@ def worker(
         logger.info(f"Task {config.name} encoded.")
 
     if not (task.encoded_tar_dir / task.config.xares_settings.encoded_ready_filename).exists():
-        logger.info(f"Task {config.name} is private and not ready, skipping.")
+        logger.warning(f"Task {config.name} is private and not ready, skipping.")
         do_mlp = do_knn = False
 
     mlp_score = 0
@@ -58,11 +59,12 @@ def worker(
 
 
 def main(args):
+    setup_global_logger()
     torch.multiprocessing.set_start_method("spawn")
 
     # Stage 0: Download all datasets
     stage_0 = partial(worker, do_download=True)
-    if args.first_stage <= 0:
+    if args.from_stage <= 0:
         try:
             with mp.Pool(processes=args.max_jobs) as pool:
                 pool.starmap(stage_0, [(args.encoder_py, task_py) for task_py in args.tasks_py])
@@ -73,20 +75,27 @@ def main(args):
 
     # Stage 1: Execute make_encoded_tar
     stage_1 = partial(worker, do_encode=True)
-    if args.first_stage <= 1:
-        try:
-            with mp.Pool(processes=args.max_jobs) as pool:
-                pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in args.tasks_py])
-            logger.info("Stage 1 completed: All tasks encoded.")
-        except Exception as e:
-            logger.error(f"Error in stage 1 (encode): {e}. Must fix it before proceeding.")
-            raise e
+    if args.from_stage <= 1:
+        max_jobs = args.max_jobs
+        while True:
+            try:
+                with mp.Pool(processes=max_jobs) as pool:
+                    pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in args.tasks_py])
+                logger.info("Stage 1 completed: All tasks encoded.")
+                break
+            except RuntimeError as e:
+                if "CUDA out of memory" in str(e) and max_jobs > 1:
+                    logger.warning("CUDA out of memory, decreasing job number and retrying ...")
+                    max_jobs = max(1, max_jobs - 1)
+                else:
+                    logger.error(f"Error in stage 1 (encode): {e}")
+                    raise e
 
     # Stage 2: Execute mlp and knn scoring
     stage_2 = lambda encoder_py, task_py, result: result.update(
         {task_py: worker(encoder_py, task_py, do_mlp=True, do_knn=True)}
     )
-    if args.first_stage <= 2:
+    if args.from_stage <= 2:
         manager = mp.Manager()
         return_dict = manager.dict()
         with mp.Pool(processes=args.max_jobs) as pool:
@@ -114,6 +123,6 @@ if __name__ == "__main__":
         nargs="+",
     )
     parser.add_argument("--max-jobs", type=int, default=1, help="Maximum number of concurrent tasks.")
-    parser.add_argument("--first-stage", default=0, type=int, help="First stage to run.")
+    parser.add_argument("--from-stage", default=0, type=int, help="First stage to run.")
     args = parser.parse_args()
     main(args)

@@ -127,12 +127,12 @@ class XaresTask:
 
     def download_audio_tar(self):
         if self.config.private:
-            logger.info(f"Dataset {self.config.name} is private. Do not download from Zenodo.")
+            logger.warning(f"Dataset {self.config.name} is private. Do not download from Zenodo.")
             return
 
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
         if not self.config.force_download and audio_ready_path.exists():
-            logger.info(f"Skip downloading audio tar: {audio_ready_path} exists.")
+            logger.warning(f"Skip downloading audio tar: {audio_ready_path} exists.")
             return
 
         download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
@@ -146,13 +146,14 @@ class XaresTask:
 
         encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
         if not self.config.force_encode and encoded_ready_path.exists():
-            logger.info(f"Skip making encoded tar.")
+            logger.warning(f"Skip encoding: {encoded_ready_path} exists.")
             return
 
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
         if not audio_ready_path.exists():
             if self.config.private:
-                raise ValueError("For private dataset, audio tar must be provided at local path.")
+                logger.warning(f"For private dataset {self.config.name}, data must be placed at local path. Skip.")
+                return
             download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
             audio_ready_path.touch()
 

@@ -1,2 +1,1 @@
-transformers
-xares
+transformers==4.47.1

@@ -1,6 +1,4 @@
-# xares
-
-X-ARES: eXtensive Audio Representation and Evaluation Suite
+# X-ARES: eXtensive Audio Representation and Evaluation Suite
 
 ## Introduction
 
