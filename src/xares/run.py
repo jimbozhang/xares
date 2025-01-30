@@ -54,6 +54,7 @@ def worker(
         knn_score = task.run_knn()
         logger.info(f"KNN score of {config.name}: {knn_score}")
 
+    torch.cuda.empty_cache()
     return mlp_score, knn_score
 
 

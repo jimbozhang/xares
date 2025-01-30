@@ -206,6 +206,15 @@ class XaresTask:
         encoded_ready_path.touch()
 
     def run_mlp(self) -> float:
+        mlp_score = 0
+        score_file = self.ckpt_dir / "mlp_score.txt"
+
+        if score_file.exists():
+            with open(score_file, "r") as f:
+                mlp_score = float(f.read())
+            logger.info(f"Loaded MLP score from {score_file}: {mlp_score}")
+            return mlp_score
+
         if self.config.k_fold_splits:
             # K-fold cross validation
             acc = []
@@ -229,8 +238,7 @@ class XaresTask:
             avg_score = np.mean(acc)
             logger.info(f"The averaged {self.config.metric} of 5 folds is: {avg_score}")
 
-            return avg_score
-
+            mlp_score = avg_score
         else:
             # Single split
             self.train_mlp(
@@ -242,7 +250,13 @@ class XaresTask:
                 load_ckpt=True,
             )
             logger.info(f"The {self.config.metric}: {score}")
-            return score
+            mlp_score = score
+
+        with open(score_file, "w") as f:
+            f.write(str(mlp_score))
+        logger.info(f"Saved MLP score to {score_file}: {mlp_score}")
+
+        return mlp_score
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
         mlp = Mlp(
@@ -304,6 +318,15 @@ class XaresTask:
         return result
 
     def run_knn(self):
+        knn_score = 0
+        score_file = self.ckpt_dir / "knn_score.txt"
+
+        if score_file.exists():
+            with open(score_file, "r") as f:
+                knn_score = float(f.read())
+            logger.info(f"Loaded KNN score from {score_file}: {knn_score}")
+            return knn_score
+
         if self.config.k_fold_splits:
             # K-fold cross validation
             score = []
@@ -326,8 +349,7 @@ class XaresTask:
             avg_score = np.mean(score)
             logger.info(f"The averaged KNN {self.config.metric} of 5 folds is: {avg_score}")
 
-            return avg_score
-
+            knn_score = avg_score
         else:
             # Single split
             score = self.train_knn(
@@ -335,8 +357,13 @@ class XaresTask:
                 [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
             )
             logger.info(f"The KNN score: {score}")
-            score = score
-            return score
+            knn_score = score
+
+        with open(score_file, "w") as f:
+            f.write(str(knn_score))
+        logger.info(f"Saved KNN score to {score_file}: {knn_score}")
+
+        return knn_score
 
     def train_knn(self, train_url, eval_url):
         dl_train = create_embedding_webdataset(
