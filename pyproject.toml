@@ -7,8 +7,6 @@ name = "xares"
 version = "0.0.3"
 description = "eXtensive Audio Representation and Evaluation Suite"
 dependencies = [
-  "accelerate==1.2.1",
-  "fire",
   "loguru",
   "numpy<2",
   "scikit-learn==1.6.0",

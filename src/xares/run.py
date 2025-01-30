@@ -58,6 +58,11 @@ def worker(
     return mlp_score, knn_score
 
 
+def stage_1(encoder_py, task_py, gpu_id):
+    torch.cuda.set_device(gpu_id)
+    return worker(encoder_py, task_py, do_encode=True)
+
+
 def stage_2(encoder_py, task_py, result: dict):
     result.update({task_py: worker(encoder_py, task_py, do_mlp=True, do_knn=True)})
 
@@ -91,11 +96,14 @@ def main(args):
                 raise e
 
     # Stage 1: Execute make_encoded_tar
-    stage_1 = partial(worker, do_encode=True)
     if args.from_stage <= 1 and args.to_stage >= 1:
         try:
+            num_gpus = torch.cuda.device_count()
             with mp.Pool(processes=args.max_jobs) as pool:
-                pool.starmap(stage_1, [(args.encoder_py, task_py) for task_py in args.tasks_py])
+                pool.starmap(
+                    stage_1,
+                    [(args.encoder_py, task_py, i % num_gpus) for i, task_py in enumerate(args.tasks_py)],
+                )
             logger.info("Stage 1 completed: All tasks encoded.")
         except RuntimeError as e:
             logger.error(f"Error in stage 1 (encode): {e}. Must fix it before proceeding.")
