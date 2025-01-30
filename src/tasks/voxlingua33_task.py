@@ -51,4 +51,5 @@ def voxlingua33_config(encoder) -> TaskConfig:
         epochs=50,
         batch_size_encode=64,
         crop_length=10,
+        label_processor=lambda x: class_label_maps[x["labels"]],
     )
