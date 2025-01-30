@@ -22,7 +22,6 @@ def worker(
 ):
     # Encoder setup
     encoder = attr_from_py_path(encoder_py, endswith="Encoder")()
-    assert check_audio_encoder(encoder), "Invalid encoder"
 
     # Task setup
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
@@ -66,6 +65,12 @@ def main(args):
     setup_global_logger()
     torch.multiprocessing.set_start_method("spawn")
 
+    # Check Encoder and download the pretrained weights
+    encoder = attr_from_py_path(args.encoder_py, endswith="Encoder")()
+    if not check_audio_encoder(encoder):
+        raise ValueError("Invalid encoder")
+    del encoder
+
     # Stage 0: Download all datasets
     stage_0 = partial(worker, do_download=True)
     if args.from_stage <= 0:
@@ -74,8 +79,15 @@ def main(args):
                 pool.starmap(stage_0, [(args.encoder_py, task_py) for task_py in args.tasks_py])
             logger.info("Stage 0 completed: All data downloaded.")
         except Exception as e:
-            logger.error(f"Error in stage 0 (download): {e}. Must fix it before proceeding.")
-            raise e
+            if "Max retries exceeded with url" in str(e):
+                logger.error(e)
+                logger.error("This may be caused by Zenodo temporarily banning your connection.")
+                logger.error("You may need to wait for a few hours and retry.")
+                logger.error("Alternatively, you can download manually using `tools/download_manually.sh`.")
+                return
+            else:
+                logger.error(f"Error in stage 0 (encode): {e}. Must fix it before proceeding.")
+                raise e
 
     # Stage 1: Execute make_encoded_tar
     stage_1 = partial(worker, do_encode=True)

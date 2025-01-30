@@ -17,103 +17,137 @@ fi
 mkdir -p env
 
 # asvspoof2015
-mkdir -p env/asvspoof2015
-wget https://zenodo.org/api/records/14718430/files-archive -O env/asvspoof2015/14718430.zip
-unzip env/asvspoof2015/14718430.zip -d env/asvspoof2015/
-touch env/asvspoof2015/.audio_tar_ready
+if [ ! -f env/asvspoof2015/.audio_tar_ready ]; then
+    mkdir -p env/asvspoof2015
+    wget https://zenodo.org/api/records/14718430/files-archive -O env/asvspoof2015/14718430.zip
+    unzip env/asvspoof2015/14718430.zip -d env/asvspoof2015/
+    touch env/asvspoof2015/.audio_tar_ready
+fi
 
 # cremad
-mkdir -p env/cremad
-wget https://zenodo.org/api/records/14646870/files-archive -O env/cremad/14646870.zip
-unzip env/cremad/14646870.zip -d env/cremad/
-touch env/cremad/.audio_tar_ready
+if [ ! -f env/cremad/.audio_tar_ready ]; then
+    mkdir -p env/cremad
+    wget https://zenodo.org/api/records/14646870/files-archive -O env/cremad/14646870.zip
+    unzip env/cremad/14646870.zip -d env/cremad/
+    touch env/cremad/.audio_tar_ready
+fi
 
 # esc50
-mkdir -p env/esc50
-wget https://zenodo.org/api/records/14614287/files-archive -O env/esc50/14614287.zip
-unzip env/esc50/14614287.zip -d env/esc50/
-touch env/esc50/.audio_tar_ready
+if [ ! -f env/esc50/.audio_tar_ready ]; then
+    mkdir -p env/esc50
+    wget https://zenodo.org/api/records/14614287/files-archive -O env/esc50/14614287.zip
+    unzip env/esc50/14614287.zip -d env/esc50/
+    touch env/esc50/.audio_tar_ready
+fi
 
 # fluentspeechcommands
-mkdir -p env/fluentspeechcommands
-wget https://zenodo.org/api/records/14722453/files-archive -O env/fluentspeechcommands/14722453.zip
-unzip env/fluentspeechcommands/14722453.zip -d env/fluentspeechcommands/
-touch env/fluentspeechcommands/.audio_tar_ready
+if [ ! -f env/fluentspeechcommands/.audio_tar_ready ]; then
+    mkdir -p env/fluentspeechcommands
+    wget https://zenodo.org/api/records/14722453/files-archive -O env/fluentspeechcommands/14722453.zip
+    unzip env/fluentspeechcommands/14722453.zip -d env/fluentspeechcommands/
+    touch env/fluentspeechcommands/.audio_tar_ready
+fi
 
 # freemusicarchive
-mkdir -p env/freemusicarchive
-wget https://zenodo.org/api/records/14725056/files-archive -O env/freemusicarchive/14725056.zip
-unzip env/freemusicarchive/14725056.zip -d env/freemusicarchive/
-touch env/freemusicarchive/.audio_tar_ready
+if [ ! -f env/freemusicarchive/.audio_tar_ready ]; then
+    mkdir -p env/freemusicarchive
+    wget https://zenodo.org/api/records/14725056/files-archive -O env/freemusicarchive/14725056.zip
+    unzip env/freemusicarchive/14725056.zip -d env/freemusicarchive/
+    touch env/freemusicarchive/.audio_tar_ready
+fi
 
 # fsdkaggle2018
-mkdir -p env/fsdkaggle2018
-wget https://zenodo.org/api/records/14725117/files-archive -O env/fsdkaggle2018/14725117.zip
-unzip env/fsdkaggle2018/14725117.zip -d env/fsdkaggle2018/
-touch env/fsdkaggle2018/.audio_tar_ready
+if [ ! -f env/fsdkaggle2018/.audio_tar_ready ]; then
+    mkdir -p env/fsdkaggle2018
+    wget https://zenodo.org/api/records/14725117/files-archive -O env/fsdkaggle2018/14725117.zip
+    unzip env/fsdkaggle2018/14725117.zip -d env/fsdkaggle2018/
+    touch env/fsdkaggle2018/.audio_tar_ready
+fi
 
 # gtzan_genre
-mkdir -p env/gtzan_genre
-wget https://zenodo.org/api/records/14722472/files-archive -O env/gtzan_genre/14722472.zip
-unzip env/gtzan_genre/14722472.zip -d env/gtzan_genre/
-touch env/gtzan_genre/.audio_tar_ready
+if [ ! -f env/gtzan_genre/.audio_tar_ready ]; then
+    mkdir -p env/gtzan_genre
+    wget https://zenodo.org/api/records/14722472/files-archive -O env/gtzan_genre/14722472.zip
+    unzip env/gtzan_genre/14722472.zip -d env/gtzan_genre/
+    touch env/gtzan_genre/.audio_tar_ready
+fi
 
 # libricount
-mkdir -p env/libricount
-wget https://zenodo.org/api/records/14722478/files-archive -O env/libricount/14722478.zip
-unzip env/libricount/14722478.zip -d env/libricount/
-touch env/libricount/.audio_tar_ready
+if [ ! -f env/libricount/.audio_tar_ready ]; then
+    mkdir -p env/libricount
+    wget https://zenodo.org/api/records/14722478/files-archive -O env/libricount/14722478.zip
+    unzip env/libricount/14722478.zip -d env/libricount/
+    touch env/libricount/.audio_tar_ready
+fi
 
 # librispeechmalefemale
-mkdir -p env/librispeechmalefemale
-wget https://zenodo.org/api/records/14716252/files-archive -O env/librispeechmalefemale/14716252.zip
-unzip env/librispeechmalefemale/14716252.zip -d env/librispeechmalefemale/
-touch env/librispeechmalefemale/.audio_tar_ready
+if [ ! -f env/librispeechmalefemale/.audio_tar_ready ]; then
+    mkdir -p env/librispeechmalefemale
+    wget https://zenodo.org/api/records/14716252/files-archive -O env/librispeechmalefemale/14716252.zip
+    unzip env/librispeechmalefemale/14716252.zip -d env/librispeechmalefemale/
+    touch env/librispeechmalefemale/.audio_tar_ready
+fi
 
 # nsynthinstument
-mkdir -p env/nsynthinstument
-wget https://zenodo.org/api/records/14725174/files-archive -O env/nsynthinstument/14725174.zip
-unzip env/nsynthinstument/14725174.zip -d env/nsynthinstument/
-touch env/nsynthinstument/.audio_tar_ready
+if [ ! -f env/nsynthinstument/.audio_tar_ready ]; then
+    mkdir -p env/nsynthinstument
+    wget https://zenodo.org/api/records/14725174/files-archive -O env/nsynthinstument/14725174.zip
+    unzip env/nsynthinstument/14725174.zip -d env/nsynthinstument/
+    touch env/nsynthinstument/.audio_tar_ready
+fi
 
 # ravdess
-mkdir -p env/ravdess
-wget https://zenodo.org/api/records/14722524/files-archive -O env/ravdess/14722524.zip
-unzip env/ravdess/14722524.zip -d env/ravdess/
-touch env/ravdess/.audio_tar_ready
+if [ ! -f env/ravdess/.audio_tar_ready ]; then
+    mkdir -p env/ravdess
+    wget https://zenodo.org/api/records/14722524/files-archive -O env/ravdess/14722524.zip
+    unzip env/ravdess/14722524.zip -d env/ravdess/
+    touch env/ravdess/.audio_tar_ready
+fi
 
 # speechcommandsv1
-mkdir -p env/speechcommandsv1
-wget https://zenodo.org/api/records/14722647/files-archive -O env/speechcommandsv1/14722647.zip
-unzip env/speechcommandsv1/14722647.zip -d env/speechcommandsv1/
-touch env/speechcommandsv1/.audio_tar_ready
+if [ ! -f env/speechcommandsv1/.audio_tar_ready ]; then
+    mkdir -p env/speechcommandsv1
+    wget https://zenodo.org/api/records/14722647/files-archive -O env/speechcommandsv1/14722647.zip
+    unzip env/speechcommandsv1/14722647.zip -d env/speechcommandsv1/
+    touch env/speechcommandsv1/.audio_tar_ready
+fi
 
 # speechocean762
-mkdir -p env/speechocean762
-wget https://zenodo.org/api/records/14725291/files-archive -O env/speechocean762/14725291.zip
-unzip env/speechocean762/14725291.zip -d env/speechocean762/
-touch env/speechocean762/.audio_tar_ready
+if [ ! -f env/speechocean762/.audio_tar_ready ]; then
+    mkdir -p env/speechocean762
+    wget https://zenodo.org/api/records/14725291/files-archive -O env/speechocean762/14725291.zip
+    unzip env/speechocean762/14725291.zip -d env/speechocean762/
+    touch env/speechocean762/.audio_tar_ready
+fi
 
 # urbansound8k
-mkdir -p env/urbansound8k
-wget https://zenodo.org/api/records/14722683/files-archive -O env/urbansound8k/14722683.zip
-unzip env/urbansound8k/14722683.zip -d env/urbansound8k/
-touch env/urbansound8k/.audio_tar_ready
+if [ ! -f env/urbansound8k/.audio_tar_ready ]; then
+    mkdir -p env/urbansound8k
+    wget https://zenodo.org/api/records/14722683/files-archive -O env/urbansound8k/14722683.zip
+    unzip env/urbansound8k/14722683.zip -d env/urbansound8k/
+    touch env/urbansound8k/.audio_tar_ready
+fi
 
 # vocalsound
-mkdir -p env/vocalsound
-wget https://zenodo.org/api/records/14722710/files-archive -O env/vocalsound/14722710.zip
-unzip env/vocalsound/14722710.zip -d env/vocalsound/
-touch env/vocalsound/.audio_tar_ready
+if [ ! -f env/vocalsound/.audio_tar_ready ]; then
+    mkdir -p env/vocalsound
+    wget https://zenodo.org/api/records/14722710/files-archive -O env/vocalsound/14722710.zip
+    unzip env/vocalsound/14722710.zip -d env/vocalsound/
+    touch env/vocalsound/.audio_tar_ready
+fi
 
 # voxceleb1
-mkdir -p env/voxceleb1
-wget https://zenodo.org/api/records/14725363/files-archive -O env/voxceleb1/14725363.zip
-unzip env/voxceleb1/14725363.zip -d env/voxceleb1/
-touch env/voxceleb1/.audio_tar_ready
+if [ ! -f env/voxceleb1/.audio_tar_ready ]; then
+    mkdir -p env/voxceleb1
+    wget https://zenodo.org/api/records/14725363/files-archive -O env/voxceleb1/14725363.zip
+    unzip env/voxceleb1/14725363.zip -d env/voxceleb1/
+    touch env/voxceleb1/.audio_tar_ready
+fi
 
 # voxlingua33
-mkdir -p env/voxlingua33
-wget https://zenodo.org/api/records/14723799/files-archive -O env/voxlingua33/14723799.zip
-unzip env/voxlingua33/14723799.zip -d env/voxlingua33/
-touch env/voxlingua33/.audio_tar_ready
+if [ ! -f env/voxlingua33/.audio_tar_ready ]; then
+    mkdir -p env/voxlingua33
+    wget https://zenodo.org/api/records/14723799/files-archive -O env/voxlingua33/14723799.zip
+    unzip env/voxlingua33/14723799.zip -d env/voxlingua33/
+    touch env/voxlingua33/.audio_tar_ready
+fi
