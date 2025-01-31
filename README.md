@@ -28,7 +28,7 @@ X-ARES is a toolkit for training, evaluating, and exporting audio encoders for v
 - [x] UrbanSound 8k
 - [ ] DESED
 - [x] FSD18-Kaggle
-- [x] Clotho
+- [ ] Clotho
 
 ### Music
 
