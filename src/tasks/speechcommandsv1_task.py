@@ -47,5 +47,4 @@ def speechcommandsv1_config(encoder) -> TaskConfig:
         zenodo_id="14722647",
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x[data_key]],
-        epochs=50,
     )

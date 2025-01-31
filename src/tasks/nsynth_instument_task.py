@@ -30,9 +30,8 @@ def nysnthinstument_config(encoder) -> TaskConfig:
     if config.use_mini_dataset:
         config.audio_tar_name_of_split.update(
             {
-                config.train_split: "train_sub55k_0000000.tar",
-                config.valid_split: "valid_0000000.tar",
-                config.test_split: "test_sub5k_0000000.tar",
+                config.train_split: "nsynth_train_sub55k_0000000.tar",
+                config.valid_split: "nsynth_valid_0000001.tar",
             }
         )
 
