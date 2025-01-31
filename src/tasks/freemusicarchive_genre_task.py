@@ -22,6 +22,6 @@ def fma_genre_config(encoder) -> TaskConfig:
         zenodo_id="14725056",
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x[data_key]],
-        epochs=10,
+        epochs=3,
         crop_length=10,  # 10s
     )

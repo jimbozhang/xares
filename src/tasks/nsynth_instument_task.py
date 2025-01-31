@@ -16,7 +16,7 @@ def nysnthinstument_config(encoder) -> TaskConfig:
         "brass": 9,
         "synth_lead": 10,
     }
-    return TaskConfig(
+    config = TaskConfig(
         name="nsynthinstument",
         encoder=encoder,
         train_split="nsynth_train",
@@ -26,3 +26,14 @@ def nysnthinstument_config(encoder) -> TaskConfig:
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x[data_key]],
     )
+
+    if config.use_mini_dataset:
+        config.audio_tar_name_of_split.update(
+            {
+                config.train_split: "train_sub55k_0000000.tar",
+                config.valid_split: "valid_0000000.tar",
+                config.test_split: "test_sub5k_0000000.tar",
+            }
+        )
+
+    return config

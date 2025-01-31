@@ -92,8 +92,8 @@ def main(args):
                 logger.error("Alternatively, you can download manually using `tools/download_manually.sh`.")
                 return
             else:
-                logger.error(f"Error in stage 0 (encode): {e}. Must fix it before proceeding.")
-                raise e
+                logger.error(f"Error in stage 0 (download): {e} Must fix it before proceeding.")
+                return
 
     # Stage 1: Execute make_encoded_tar
     if args.from_stage <= 1 and args.to_stage >= 1:
@@ -106,29 +106,33 @@ def main(args):
                 )
             logger.info("Stage 1 completed: All tasks encoded.")
         except RuntimeError as e:
-            logger.error(f"Error in stage 1 (encode): {e}. Must fix it before proceeding.")
-            raise e
+            logger.error(f"Error in stage 1 (encode): {e} Must fix it before proceeding.")
+            return
 
     # Stage 2: Execute mlp and knn scoring
     if args.from_stage <= 2 and args.to_stage >= 2:
         manager = mp.Manager()
         return_dict = manager.dict()
-        with mp.Pool(processes=args.max_jobs) as pool:
-            pool.starmap(
-                partial(stage_2, result=return_dict),
-                [(args.encoder_py, task_py) for task_py in args.tasks_py],
-            )
+        try:
+            with mp.Pool(processes=args.max_jobs) as pool:
+                pool.starmap(
+                    partial(stage_2, result=return_dict),
+                    [(args.encoder_py, task_py) for task_py in args.tasks_py],
+                )
+        except RuntimeError as e:
+            logger.error(f"Error in stage 2 (scoring): {e} Must fix it before proceeding.")
+            return
         logger.info("Scoring completed: All tasks scored.")
 
         # Print results
         df = pd.DataFrame(return_dict.items(), columns=["Task", "Scores"])
         df["MLP_Score"] = df["Scores"].apply(lambda x: x[0])
         df["KNN_Score"] = df["Scores"].apply(lambda x: x[1])
-        df["Task"] = df["Task"].str.replace(r".*/", "", regex=True).str.strip("_task.py")
+        df["Task"] = df["Task"].str.replace(r".*/|_task\.py$", "", regex=True)
         df.drop(columns=["Scores"], inplace=True)
         df.sort_values(by="Task", inplace=True)
 
-        print(f"\nResults: \n{df}")
+        print(f"\nResults:\n{df.to_string(index=False)}")
         print("\nAverage MLP Score:", df["MLP_Score"].mean())
         print("Average KNN Score:", df["KNN_Score"].mean())
 

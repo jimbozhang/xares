@@ -42,6 +42,7 @@ def liveenv_config(encoder) -> TaskConfig:
         test_split="liveenv_test",
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x[data_key]],
+        do_knn=False,
         epochs=50,
         encoder=encoder,
     )

@@ -39,6 +39,7 @@ class TaskConfig:
     valid_split: None | str = "valid"
     test_split: None | str = "test"
     k_fold_splits: None | List[int | str] = None
+    use_mini_dataset: bool = True  # For some large datasets, use subset for faster evaluation
 
     # Audio tar
     force_download: bool = False
@@ -70,6 +71,9 @@ class TaskConfig:
     model: nn.Module | None = None
     output_dim: int | None = None
     metric: Literal["accuracy", "EER", "mAP", "recall@k", "MAE", "MSE"] = "accuracy"
+
+    # KNN
+    do_knn: bool = True
 
     def __post_init__(self, **kwargs):
         self.update_tar_name_of_split()
@@ -105,6 +109,9 @@ class XaresTask:
         if self.config.encoder is None:
             raise ValueError("Encoder must be provided in the config.")
 
+        if self.config.use_mini_dataset:
+            logger.warning(f"Dataset {config.name} use mini version for faster evaluation.")
+
         self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.encoder = self.config.encoder.to(self.encoder_device)
         self.mlp = None
@@ -117,6 +124,7 @@ class XaresTask:
         self.encoder_name = self.encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
+        self.encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
         mkdir_if_not_exists(self.encoded_tar_dir)
 
@@ -144,9 +152,8 @@ class XaresTask:
         audio_ready_path.touch()
 
     def make_encoded_tar(self):
-        encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
-        if not self.config.force_encode and encoded_ready_path.exists():
-            logger.warning(f"Skip encoding: {encoded_ready_path} exists.")
+        if not self.config.force_encode and self.encoded_ready_path.exists():
+            logger.warning(f"Skip encoding: {self.encoded_ready_path} exists.")
             return
 
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
@@ -203,7 +210,7 @@ class XaresTask:
                             }
                         )
 
-        encoded_ready_path.touch()
+        self.encoded_ready_path.touch()
 
     def run_mlp(self) -> float:
         mlp_score = 0
@@ -293,6 +300,12 @@ class XaresTask:
             label_processor=self.label_processor,
         )
 
+        try:
+            self.trainer.run(dl_train, dl_val)
+        except RuntimeError as e:
+            if "at least one example" in str(e):
+                raise RuntimeError(f"Empty dataloader. Try delete {self.encoded_ready_path} and re-run.")
+
         self.trainer.run(dl_train, dl_val)
 
     def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Dict[METRICS_TYPE, Any]:
@@ -319,6 +332,10 @@ class XaresTask:
 
     def run_knn(self):
         knn_score = 0
+        if not self.config.do_knn:
+            logger.warning(f"Skip KNN evaluation for {self.config.name}.")
+            return knn_score
+
         score_file = self.ckpt_dir / "knn_score.txt"
 
         if score_file.exists():

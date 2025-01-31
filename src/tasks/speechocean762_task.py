@@ -15,5 +15,6 @@ def speechocean762_config(encoder) -> TaskConfig:
         criterion="MSELoss",
         batch_size_encode=1,  # Just avoid padding for this task
         label_processor=lambda x: float(x[data_key]),
+        do_knn=False,
         epochs=25,
     )

@@ -38,7 +38,7 @@ def voxlingua33_config(encoder) -> TaskConfig:
         "sr": 32,
     }
 
-    return TaskConfig(
+    config = TaskConfig(
         name="voxlingua33",
         encoder=encoder,
         batch_size_train=64,
@@ -48,8 +48,13 @@ def voxlingua33_config(encoder) -> TaskConfig:
         valid_split="dev",
         zenodo_id="14723799",
         output_dim=len(class_label_maps),
-        epochs=50,
+        epochs=10,
         batch_size_encode=64,
         crop_length=10,
         label_processor=lambda x: class_label_maps[x["labels"]],
     )
+
+    if config.use_mini_dataset:
+        config.audio_tar_name_of_split[config.train_split] = "train_subset_2k_0000006.tar"
+
+    return config

@@ -1255,7 +1255,7 @@ def voxceleb1_config(encoder) -> TaskConfig:
         "id11250": 1249,
         "id11251": 1250,
     }
-    return TaskConfig(
+    config = TaskConfig(
         name="voxceleb1",
         train_split="voxceleb1_train",
         test_split="voxceleb1_test",
@@ -1266,3 +1266,8 @@ def voxceleb1_config(encoder) -> TaskConfig:
         label_processor=lambda x: class_label_maps[x["speakerid"]],
         encoder=encoder,
     )
+
+    if config.use_mini_dataset:
+        config.audio_tar_name_of_split[config.train_split] = "voxceleb1_train_0000000.tar"
+
+    return config

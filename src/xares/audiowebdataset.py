@@ -14,6 +14,9 @@ from loguru import logger
 
 
 def fast_warn_and_continue(exn):
+    if "Format not recognised" in repr(exn):
+        raise RuntimeError("Format not recognised")
+
     warnings.warn(repr(exn))
     return True
 
