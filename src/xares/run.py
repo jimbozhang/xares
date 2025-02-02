@@ -14,7 +14,7 @@ from xares.utils import attr_from_py_path
 
 
 def worker(
-    encoder_py: str,
+    encoder_py: None | str,
     task_py: str,
     do_download: bool = False,
     do_encode: bool = False,
@@ -22,7 +22,7 @@ def worker(
     do_knn: bool = False,
 ):
     # Encoder setup
-    encoder = attr_from_py_path(encoder_py, endswith="Encoder")()
+    encoder = attr_from_py_path(encoder_py, endswith="Encoder")() if encoder_py else None
 
     # Task setup
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
@@ -70,20 +70,15 @@ def stage_2(encoder_py, task_py, result: dict):
 
 def main(args):
     setup_global_logger()
+    enable_multiprocessing = True
     torch.multiprocessing.set_start_method("spawn")
-
-    # Check Encoder and download the pretrained weights
-    encoder = attr_from_py_path(args.encoder_py, endswith="Encoder")()
-    if not check_audio_encoder(encoder):
-        raise ValueError("Invalid encoder")
-    del encoder
 
     # Stage 0: Download all datasets
     stage_0 = partial(worker, do_download=True)
     if args.from_stage <= 0:
         try:
             with mp.Pool(processes=args.max_jobs) as pool:
-                pool.starmap(stage_0, [(args.encoder_py, task_py) for task_py in args.tasks_py])
+                pool.starmap(stage_0, [(None, task_py) for task_py in args.tasks_py])
             logger.info("Stage 0 completed: All data downloaded.")
         except Exception as e:
             if "Max retries exceeded with url" in str(e):
@@ -95,34 +90,64 @@ def main(args):
             else:
                 logger.error(f"Error in stage 0 (download): {e} Must fix it before proceeding.")
                 return
+    if args.to_stage == 0:
+        return
+
+    # Check if the encoder supports the multiprocessing
+    if enable_multiprocessing:
+        try:
+            with mp.Pool(processes=1) as pool:
+                pool.starmap(worker, [(args.encoder_py, args.tasks_py[0])])
+        except Exception as e:
+            logger.warning("Multiprocessing is not supported for the encoder, falling back to single process.")
+            logger.warning("If single process too slow, you may manually parallel tasks with a shell script.")
+            enable_multiprocessing = False
+
+    # Double check the encoder and download the pretrained weights
+    encoder = attr_from_py_path(args.encoder_py, endswith="Encoder")()
+    if not check_audio_encoder(encoder):
+        raise ValueError("Invalid encoder")
+    del encoder
 
     # Stage 1: Execute make_encoded_tar
-    if args.from_stage <= 1 and args.to_stage >= 1:
-        try:
-            num_gpus = torch.cuda.device_count()
-            with mp.Pool(processes=args.max_jobs) as pool:
-                pool.starmap(
-                    stage_1,
-                    [(args.encoder_py, task_py, i % num_gpus) for i, task_py in enumerate(args.tasks_py)],
-                )
-            logger.info("Stage 1 completed: All tasks encoded.")
-        except RuntimeError as e:
-            logger.error(f"Error in stage 1 (encode): {e} Must fix it before proceeding.")
-            return
+    if args.from_stage <= 1:
+        if enable_multiprocessing:
+            try:
+                num_gpus = torch.cuda.device_count()
+                with mp.Pool(processes=args.max_jobs) as pool:
+                    pool.starmap(
+                        stage_1,
+                        [(args.encoder_py, task_py, i % num_gpus) for i, task_py in enumerate(args.tasks_py)],
+                    )
+                logger.info("Stage 1 completed: All tasks encoded.")
+            except RuntimeError as e:
+                logger.error(f"Error in stage 1 (encode): {e} Must fix it before proceeding.")
+                return
+        else:
+            for task_py in args.tasks_py:
+                worker(args.encoder_py, task_py, do_encode=True)
+        logger.info("Stage 1 completed: All tasks encoded.")
+    if args.to_stage == 1:
+        return
 
     # Stage 2: Execute mlp and knn scoring
     if args.from_stage <= 2 and args.to_stage >= 2:
-        manager = mp.Manager()
-        return_dict = manager.dict()
-        try:
-            with mp.Pool(processes=args.max_jobs) as pool:
-                pool.starmap(
-                    partial(stage_2, result=return_dict),
-                    [(args.encoder_py, task_py) for task_py in args.tasks_py],
-                )
-        except RuntimeError as e:
-            logger.error(f"Error in stage 2 (scoring): {e} Must fix it before proceeding.")
-            return
+        if enable_multiprocessing:
+            manager = mp.Manager()
+            return_dict = manager.dict()
+            try:
+                with mp.Pool(processes=args.max_jobs) as pool:
+                    pool.starmap(
+                        partial(stage_2, result=return_dict),
+                        [(args.encoder_py, task_py) for task_py in args.tasks_py],
+                    )
+            except RuntimeError as e:
+                logger.error(f"Error in stage 2 (scoring): {e} Must fix it before proceeding.")
+                return
+        else:
+            return_dict = {}
+            for task_py in args.tasks_py:
+                return_dict[task_py] = worker(args.encoder_py, task_py, do_mlp=True, do_knn=True)
         logger.info("Scoring completed: All tasks scored.")
 
         # Print results

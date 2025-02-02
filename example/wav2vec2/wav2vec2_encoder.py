@@ -17,4 +17,4 @@ class Wav2vec2Encoder(nn.Module):
             audio, sampling_rate=self.sampling_rate, return_tensors="pt"
         ).input_values.squeeze()
 
-        return self.model(input_values)["last_hidden_state"]
+        return self.model(input_values.to(self.model.device))["last_hidden_state"]

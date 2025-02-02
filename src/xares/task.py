@@ -50,7 +50,7 @@ class TaskConfig:
 
     # Encoded tar
     force_encode: bool = False
-    encoder: Any = None
+    encoder: None | Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
     save_encoded_per_batches: int = 2000
@@ -107,22 +107,20 @@ class TaskConfig:
 class XaresTask:
     def __init__(self, config: TaskConfig):
         self.config = config
-        if self.config.encoder is None:
-            raise ValueError("Encoder must be provided in the config.")
 
-        if self.config.use_mini_dataset:
-            logger.warning(f"Dataset {config.name} use mini version for faster evaluation.")
-
-        self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.encoder = self.config.encoder.to(self.encoder_device)
-        self.mlp = None
+        if self.config.encoder is not None:
+            self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.encoder = self.config.encoder.to(self.encoder_device)
+            self.encoder_name = self.encoder.__class__.__name__
+        else:
+            self.encoder = None
+            self.encoder_name = "Unknown"
 
         torch.set_num_threads(self.config.torch_num_threads)
         torch.manual_seed(self.config.seed)
         np.random.seed(self.config.seed)
 
         self.env_dir = Path(self.config.env_root) / self.config.name
-        self.encoder_name = self.encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
         self.encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename

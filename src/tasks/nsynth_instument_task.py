@@ -1,3 +1,5 @@
+from loguru import logger
+
 from xares.task import TaskConfig
 
 
@@ -28,6 +30,7 @@ def nysnthinstument_config(encoder) -> TaskConfig:
     )
 
     if config.use_mini_dataset:
+        logger.warning(f"Dataset {config.name} uses mini version for faster evaluation.")
         config.audio_tar_name_of_split.update(
             {
                 config.train_split: "nsynth_train_sub55k_0000000.tar",

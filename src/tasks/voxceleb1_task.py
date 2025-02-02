@@ -1,3 +1,5 @@
+from loguru import logger
+
 from xares.task import TaskConfig
 
 
@@ -1269,5 +1271,6 @@ def voxceleb1_config(encoder) -> TaskConfig:
 
     if config.use_mini_dataset:
         config.audio_tar_name_of_split[config.train_split] = "voxceleb1_train_0000000.tar"
+        logger.warning(f"Dataset {config.name} uses mini version for faster evaluation.")
 
     return config

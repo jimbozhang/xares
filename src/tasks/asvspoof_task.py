@@ -1,3 +1,5 @@
+from loguru import logger
+
 from xares.task import TaskConfig
 
 
@@ -19,6 +21,7 @@ def asvspoof2015_config(encoder) -> TaskConfig:
     )
 
     if config.use_mini_dataset:
+        logger.warning(f"Dataset {config.name} uses mini version for faster evaluation.")
         config.audio_tar_name_of_split = {
             config.train_split: "asvspoof_train_0000000.tar",
             config.valid_split: "asvspoof_valid_0000000.tar",
