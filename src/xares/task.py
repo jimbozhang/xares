@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import io
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal
+from typing import Any, Callable, Dict, List, Literal, Tuple
 
 import numpy as np
 import torch
@@ -212,19 +213,23 @@ class XaresTask:
 
         self.encoded_ready_path.touch()
 
-    def run_mlp(self) -> float:
+    def run_mlp(self) -> Tuple[float, int]:
         mlp_score = 0
+        eval_size = 0
         score_file = self.ckpt_dir / "mlp_score.txt"
 
         if score_file.exists():
             with open(score_file, "r") as f:
-                mlp_score = float(f.read())
+                lines = f.read().splitlines()
+                mlp_score = float(lines[0])
+                eval_size = int(lines[1])
             logger.info(f"Loaded MLP score from {score_file}: {mlp_score}")
-            return mlp_score
+            return mlp_score, eval_size
 
         if self.config.k_fold_splits:
             # K-fold cross validation
             acc = []
+            eval_sizes = []
             splits = self._make_splits()
             wds_encoded_training_fold_k = {
                 k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
@@ -237,15 +242,19 @@ class XaresTask:
                     wds_encoded_training_fold_k[k],
                     [self.encoded_tar_path_of_split[k].as_posix()],
                 )
-                acc.append(self.evaluate_mlp([self.encoded_tar_path_of_split[k].as_posix()], load_ckpt=True))
+                score, eval_size = self.evaluate_mlp([self.encoded_tar_path_of_split[k].as_posix()], load_ckpt=True)
+                acc.append(score)
+                eval_sizes.append(eval_size)
 
             for k in range(len(splits)):
                 logger.info(f"Fold {k+1} {self.config.metric}: {acc[k]}")
 
             avg_score = np.mean(acc)
+            total_eval_size = int(np.average(eval_sizes))
             logger.info(f"The averaged {self.config.metric} of 5 folds is: {avg_score}")
 
             mlp_score = avg_score
+            eval_size = total_eval_size
         else:
             # Single split
             self.train_mlp(
@@ -257,13 +266,13 @@ class XaresTask:
                 load_ckpt=True,
             )
             logger.info(f"The {self.config.metric}: {score}")
-            mlp_score = score
+            mlp_score, eval_size = score
 
         with open(score_file, "w") as f:
-            f.write(str(mlp_score))
+            f.write(f"{mlp_score}\n{eval_size}")
         logger.info(f"Saved MLP score to {score_file}: {mlp_score}")
 
-        return mlp_score
+        return mlp_score, eval_size
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
         mlp = Mlp(
@@ -308,7 +317,7 @@ class XaresTask:
 
         self.trainer.run(dl_train, dl_val)
 
-    def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Dict[METRICS_TYPE, Any]:
+    def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Tuple[Dict[METRICS_TYPE, Any], int]:
         if self.trainer is None:
             raise ValueError("Train the model first before evaluation.")
 
@@ -325,64 +334,68 @@ class XaresTask:
             num_workers=self.config.num_validation_workers,
             label_processor=self.label_processor,
         )
-        result = self.trainer.run_inference(dl)
-        # for k,v in result.items():
-        # logger.info(f"{k}: {v}")
-        return result
+        return self.trainer.run_inference(dl)  # (result, size)
 
-    def run_knn(self):
+    def run_knn(self) -> Tuple[float, int]:
         knn_score = 0
+        eval_size = 0
         if not self.config.do_knn:
             logger.warning(f"Skip KNN evaluation for {self.config.name}.")
-            return knn_score
+            return knn_score, eval_size
 
         score_file = self.ckpt_dir / "knn_score.txt"
 
         if score_file.exists():
             with open(score_file, "r") as f:
-                knn_score = float(f.read())
+                lines = f.read().splitlines()
+                knn_score = float(lines[0])
+                eval_size = int(lines[1])
             logger.info(f"Loaded KNN score from {score_file}: {knn_score}")
-            return knn_score
+            return knn_score, eval_size
 
         if self.config.k_fold_splits:
             # K-fold cross validation
-            score = []
+            scores = []
+            eval_sizes = []
             splits = self._make_splits()
             wds_encoded_training_fold_k = {
                 k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
             }
 
             for k in splits:
-                score.append(
-                    self.train_knn(
-                        wds_encoded_training_fold_k[k],
-                        [self.encoded_tar_path_of_split[k].as_posix()],
-                    )
+                score, size = self.train_and_eval_knn(
+                    wds_encoded_training_fold_k[k],
+                    [self.encoded_tar_path_of_split[k].as_posix()],
                 )
+                scores.append(score)
+                eval_sizes.append(size)
 
             for k in range(len(splits)):
-                logger.info(f"Fold {k+1} {self.config.metric}: {score[k]}")
+                logger.info(f"Fold {k+1} {self.config.metric}: {scores[k]}")
 
-            avg_score = np.mean(score)
+            avg_score = np.mean(scores)
+            total_eval_size = int(np.average(eval_sizes))
             logger.info(f"The averaged KNN {self.config.metric} of 5 folds is: {avg_score}")
 
             knn_score = avg_score
+            eval_size = total_eval_size
         else:
             # Single split
-            score = self.train_knn(
+            score, size = self.train_and_eval_knn(
                 [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
                 [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
             )
             logger.info(f"The KNN score: {score}")
             knn_score = score
+            eval_size = size
 
         with open(score_file, "w") as f:
-            f.write(str(knn_score))
+            f.write(f"{knn_score}\n{eval_size}")
         logger.info(f"Saved KNN score to {score_file}: {knn_score}")
 
-        return knn_score
+        return knn_score, eval_size
 
-    def train_knn(self, train_url, eval_url):
+    def train_and_eval_knn(self, train_url, eval_url) -> Tuple[float, int]:
         dl_train = create_embedding_webdataset(
             train_url,
             tar_shuffle=2000,
@@ -399,8 +412,7 @@ class XaresTask:
             label_processor=self.label_processor,
         )
         knn_trainer = KNNTrainer(num_classes=self.config.output_dim)
-        scores = knn_trainer.train(dl_train, dl_eval)
-        return scores
+        return knn_trainer.train_and_eval(dl_train, dl_eval)
 
     def run(self):
         self.download_audio_tar()

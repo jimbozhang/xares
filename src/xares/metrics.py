@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Literal
+from typing import Callable, Dict, List, Literal, Tuple
 
 import numpy as np
 import torch
@@ -162,3 +162,44 @@ def _clapscore(
     if select:
         ret = ret[select]
     return ret
+
+
+def weighted_average(scores_dict: Dict[str, List[Tuple[float, int]]]) -> List[float]:
+    """
+    Compute the weighted average of scores.
+
+    Args:
+        scores_dict (Dict[str, List[Tuple[float, int]]]):
+            A dictionary where the key is a dataset name and the value is a list of tuples.
+            Each tuple contains a score and its corresponding weight.
+
+    Returns:
+        List[float]: A list of weighted average scores,
+        where each element is the weighted average for scores at the same index across datasets.
+
+    Example:
+        scores_dict = {
+            'dataset_1': [(0.8, 100), (0.6, 50)],
+            'dataset_2': [(0.9, 200), (0.7, 100)]
+        }
+        result = weighted_average(scores_dict)
+        # result should be approximately: [
+        #   (0.8 * 100 + 0.9 * 200) / (100 + 200),  # Weighted average for the first score index across datasets
+        #   (0.6 * 50 + 0.7 * 100) / (50 + 100)   # Weighted average for the second score index across datasets
+        # ]
+        # result should be approximately [0.8666666666666667, 0.6666666666666666]
+    """
+
+    output = []
+    num_score_types = len(list(scores_dict.values())[0]) if scores_dict else 0  # Handle empty scores_dict
+    for score_index in range(num_score_types):
+        weighted_sum = 0
+        total_weight = 0
+        for dataset_scores in scores_dict.values():
+            if score_index < len(dataset_scores):  # Check if score_index is valid for current dataset
+                score, weight = dataset_scores[score_index]
+                weighted_sum += score * weight
+                total_weight += weight
+        weighted_avg = weighted_sum / total_weight if total_weight != 0 else 0
+        output.append(weighted_avg)
+    return output

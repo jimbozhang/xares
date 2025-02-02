@@ -8,6 +8,7 @@ from loguru import logger
 
 from xares.audio_encoder_checker import check_audio_encoder
 from xares.common import setup_global_logger
+from xares.metrics import weighted_average
 from xares.task import XaresTask
 from xares.utils import attr_from_py_path
 
@@ -126,15 +127,17 @@ def main(args):
 
         # Print results
         df = pd.DataFrame(return_dict.items(), columns=["Task", "Scores"])
-        df["MLP_Score"] = df["Scores"].apply(lambda x: x[0])
-        df["KNN_Score"] = df["Scores"].apply(lambda x: x[1])
+        df["MLP_Score"] = df["Scores"].apply(lambda x: x[0][0])
+        df["KNN_Score"] = df["Scores"].apply(lambda x: x[1][0])
         df["Task"] = df["Task"].str.replace(r".*/|_task\.py$", "", regex=True)
         df.drop(columns=["Scores"], inplace=True)
         df.sort_values(by="Task", inplace=True)
 
         print(f"\nResults:\n{df.to_string(index=False)}")
-        print("\nAverage MLP Score:", df["MLP_Score"].mean())
-        print("Average KNN Score:", df["KNN_Score"].mean())
+
+        avg_mlp, avg_knn = weighted_average(return_dict)
+        print("\nWeighted Average MLP Score:", avg_mlp)
+        print("Weighted Average KNN Score:", avg_knn)
 
 
 if __name__ == "__main__":

@@ -102,12 +102,14 @@ class Trainer:
             self.optimizer.step()
             return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 
-    def run_inference(self, dl_eval: Iterable):
+    def run_inference(self, dl_eval):
         local_evaluator = self.ignite_evaluator
         eval_metric = self._metric_obj.metric()
         eval_metric.attach(local_evaluator, self.metric)
         local_evaluator.run(dl_eval)
-        return local_evaluator.state.metrics[self.metric]
+
+        dl_eval_size = sum(1 for _ in dl_eval)
+        return local_evaluator.state.metrics[self.metric], dl_eval_size
 
     def run(self, dl_train, dl_dev):
         metrics = {"loss": Loss(self.model.criterion), self.metric: self._metric_obj.metric()}
@@ -201,7 +203,7 @@ class KNNTrainer:
         # self.evaluate_engine = Engine(lambda batch:)
         EpochOutputStore().attach(self.trainer, "output")
 
-    def train(self, dl_train, dl_eval):
+    def train_and_eval(self, dl_train, dl_eval) -> Tuple[float, int]:
         logger.info("KNN Feature extraction run.")
         self.trainer.run(dl_train)  # Store all features in memory, should be for most cases okay
         train_data, train_labels = zip(*self.trainer.state.output)
@@ -219,9 +221,10 @@ class KNNTrainer:
             metric.attach(eval_engine, name)
 
         eval_engine.run(dl_eval)
+        dl_eval_size = sum(1 for _ in dl_eval)
         metrics = eval_engine.state.metrics
         logger.info(f"KNN {self.metric}: {metrics[self.metric]:.3f}")
-        return metrics[self.metric]
+        return metrics[self.metric], dl_eval_size
 
 
 if __name__ == "__main__":
