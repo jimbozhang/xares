@@ -122,7 +122,10 @@ def main(args):
                     )
                 logger.info("Stage 1 completed: All tasks encoded.")
             except RuntimeError as e:
-                logger.error(f"Error in stage 1 (encode): {e} Must fix it before proceeding.")
+                if "CUDA out of memory" in str(e):
+                    logger.error("CUDA out of memory. Try reducing `config.batch_size_encode` of tasks.")
+                else:
+                    logger.error(f"Error in stage 1 (encode): {e} Must fix it before proceeding.")
                 return
         else:
             for task_py in args.tasks_py:

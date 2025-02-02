@@ -51,7 +51,6 @@ def voxlingua33_config(encoder) -> TaskConfig:
         zenodo_id="14723799",
         output_dim=len(class_label_maps),
         epochs=10,
-        batch_size_encode=64,
         crop_length=10,
         label_processor=lambda x: class_label_maps[x["labels"]],
     )
