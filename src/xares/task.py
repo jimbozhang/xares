@@ -54,7 +54,7 @@ class TaskConfig:
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
     save_encoded_per_batches: int = 2000
-    batch_size_encode: int = 64
+    batch_size_encode: int = 16
     num_encoder_workers: int = 4
     crop_length: None | float = None
 

@@ -99,8 +99,9 @@ def main(args):
             with mp.Pool(processes=1) as pool:
                 pool.starmap(worker, [(args.encoder_py, args.tasks_py[0])])
         except Exception as e:
-            logger.warning("Multiprocessing is not supported for the encoder, falling back to single process.")
-            logger.warning("If single process too slow, you may manually parallel tasks with a shell script.")
+            logger.warning("Multiprocessing is not supported for the encoder. Falling back to a single process.")
+            logger.warning("If single processing is too slow, you can manually parallelize tasks with a shell script.")
+            logger.warning("For models from Hugging Face, try save locally, which might fix for multiprocessing.")
             enable_multiprocessing = False
 
     # Double check the encoder and download the pretrained weights
