@@ -43,13 +43,13 @@ def worker(
         logger.warning(f"Task {config.name} is private and not ready, skipping.")
         do_mlp = do_knn = False
 
-    mlp_score = 0
+    mlp_score = (0, 1)
     if do_mlp:
         logger.info(f"Running run_mlp for task {config.name} ...")
         mlp_score = task.run_mlp()
         logger.info(f"MLP score of {config.name}: {mlp_score}")
 
-    knn_score = 0
+    knn_score = (0, 1)
     if do_knn:
         logger.info(f"Running KNN for task {config.name} ...")
         knn_score = task.run_knn()
@@ -70,7 +70,7 @@ def stage_2(encoder_py, task_py, result: dict):
 
 def main(args):
     setup_global_logger()
-    enable_multiprocessing = True
+    enable_multiprocessing = args.max_jobs > 0
     torch.multiprocessing.set_start_method("spawn")
 
     # Stage 0: Download all datasets
