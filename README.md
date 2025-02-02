@@ -18,7 +18,6 @@ X-ARES is a toolkit for training, evaluating, and exporting audio encoders for v
 - [x] CREMA-D
 - [x] RAVDESS
 - [ ] LibriSpeech-Phoneme
-- [x] speechocean762
 - [x] ASV2015
 
 ### Environment
