@@ -46,4 +46,4 @@ if __name__ == "__main__":
     from xares.audio_encoder_checker import check_audio_encoder
 
     encoder = WhisperEncoder()
-    check_audio_encoder(encoder)
+    assert check_audio_encoder(encoder)
