@@ -57,6 +57,6 @@ def voxlingua33_config(encoder) -> TaskConfig:
 
     if config.use_mini_dataset:
         logger.warning(f"Dataset {config.name} uses mini version for faster evaluation.")
-        config.audio_tar_name_of_split[config.train_split] = "train_subset_2k_0000006.tar"
+        config.audio_tar_name_of_split[config.train_split] = "train_subset_2k_00000{00..01}.tar"
 
     return config

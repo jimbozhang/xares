@@ -1263,13 +1263,14 @@ def voxceleb1_config(encoder) -> TaskConfig:
         test_split="voxceleb1_test",
         valid_split="voxceleb1_valid",
         zenodo_id="14725363",
+        epochs=5,
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x["speakerid"]],
         encoder=encoder,
     )
 
     if config.use_mini_dataset:
-        config.audio_tar_name_of_split[config.train_split] = "voxceleb1_train_0000000.tar"
+        config.audio_tar_name_of_split[config.train_split] = "voxceleb1_train_00000{00..02}.tar"
         logger.warning(f"Dataset {config.name} uses mini version for faster evaluation.")
 
     return config
