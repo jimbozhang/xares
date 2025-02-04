@@ -2,7 +2,7 @@
 
 ## Introduction
 
-X-ARES is a toolkit for training, evaluating, and exporting audio encoders for various audio tasks. It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/).
+X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/).
 
 ## Supported tasks
 
