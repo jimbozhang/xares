@@ -43,14 +43,14 @@ def worker(
         logger.warning(f"Task {config.name} is private and not ready, skipping.")
         do_mlp = do_knn = False
 
-    mlp_score = (0, 1)
+    mlp_score = (0, 0)
     if do_mlp:
         logger.info(f"Running run_mlp for task {config.name} ...")
         mlp_score = task.run_mlp()
         logger.info(f"MLP score of {config.name}: {mlp_score}")
 
-    knn_score = (0, 1)
-    if do_knn:
+    knn_score = (0, 0)
+    if do_knn and task.config.do_knn:
         logger.info(f"Running KNN for task {config.name} ...")
         knn_score = task.run_knn()
         logger.info(f"KNN score of {config.name}: {knn_score}")
