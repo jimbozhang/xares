@@ -1,7 +1,7 @@
 from xares.task import TaskConfig
 
 
-def speechcommandsv1_config(**kwargs) -> TaskConfig:
+def speechcommandsv1_config(encoder) -> TaskConfig:
     class_label_maps = {
         "sheila": 0,
         "up": 1,
@@ -36,19 +36,15 @@ def speechcommandsv1_config(**kwargs) -> TaskConfig:
     }
     data_key = "labels"
 
-    config_params = {
-        "name": "speechcommandsv1",
-        "batch_size_train": 64,
-        "learning_rate": 1e-3,
-        "train_split": "wds-audio-train",
-        "valid_split": "wds-audio-valid",
-        "test_split": "wds-audio-test",
-        "zenodo_id": "TODO",
-        "output_dim": len(class_label_maps),
-        "label_processor": lambda x: class_label_maps[x[data_key]],
-        "epochs": 50,
-    }
-
-    config_params.update(kwargs)
-
-    return TaskConfig(**config_params)
+    return TaskConfig(
+        encoder=encoder,
+        name="speechcommandsv1",
+        batch_size_train=64,
+        learning_rate=1e-3,
+        train_split="wds-audio-train",
+        valid_split="wds-audio-valid",
+        test_split="wds-audio-test",
+        zenodo_id="14722647",
+        output_dim=len(class_label_maps),
+        label_processor=lambda x: class_label_maps[x[data_key]],
+    )

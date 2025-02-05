@@ -1,28 +1,26 @@
 from __future__ import annotations
 
 import io
-import logging
 import json
-import sys
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal
+from typing import Any, Callable, Dict, List, Literal, Tuple
 
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 import torch.nn as nn
+import webdataset as wds
 from loguru import logger
 from tqdm import tqdm
 
-import webdataset as wds
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.metrics import METRICS_TYPE
 from xares.models import Mlp
 from xares.trainer import KNNTrainer, Trainer
 from xares.utils import download_zenodo_record, mkdir_if_not_exists
-
-
 
 
 @dataclass
@@ -42,21 +40,21 @@ class TaskConfig:
     valid_split: None | str = "valid"
     test_split: None | str = "test"
     k_fold_splits: None | List[int | str] = None
+    use_mini_dataset: bool = True  # For some large datasets, use subset for faster evaluation
 
     # Audio tar
     force_download: bool = False
-    force_generate_audio_tar: bool = False
     audio_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     num_shards_rawaudio = 4
     zenodo_id: str | None = None
 
     # Encoded tar
     force_encode: bool = False
-    encoder: Any = None
+    encoder: None | Any = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
     save_encoded_per_batches: int = 2000
-    batch_size_encode: int = 64
+    batch_size_encode: int = 16
     num_encoder_workers: int = 4
     crop_length: None | float = None
 
@@ -73,7 +71,10 @@ class TaskConfig:
     num_validation_workers: int = 0
     model: nn.Module | None = None
     output_dim: int | None = None
-    metric: Literal["accuracy","EER","mAP","recall@k","MAE", "MSE"] = "accuracy"
+    metric: Literal["accuracy", "EER", "mAP", "recall@k", "MAE", "MSE"] = "accuracy"
+
+    # KNN
+    do_knn: bool = True
 
     def __post_init__(self, **kwargs):
         self.update_tar_name_of_split()
@@ -104,33 +105,25 @@ class TaskConfig:
 
 
 class XaresTask:
-    def __init__(self, encoder: nn.Module, config: None | TaskConfig = None):
-        logging.captureWarnings(True)
-        logging.getLogger("py.warnings").setLevel(logging.ERROR)
-        # Make the logger with this format the default for all loggers in this package
-        logger.configure(
-            handlers=[
-                {
-                    "sink": sys.stdout,
-                    "format": "<fg #FF6900>(X-ARES)</fg #FF6900> [<yellow>{time:YYYY-MM-DD HH:mm:ss}</yellow>] {message}",
-                    "level": "DEBUG",
-                }
-            ]
-        )
+    def __init__(self, config: TaskConfig):
+        self.config = config
 
-        self.config = config or TaskConfig(encoder=encoder)
-        self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.encoder = encoder.to(self.encoder_device)
-        self.mlp = None
+        if self.config.encoder is not None:
+            self.encoder_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.encoder = self.config.encoder.to(self.encoder_device)
+            self.encoder_name = self.encoder.__class__.__name__
+        else:
+            self.encoder = None
+            self.encoder_name = "Unknown"
 
         torch.set_num_threads(self.config.torch_num_threads)
         torch.manual_seed(self.config.seed)
         np.random.seed(self.config.seed)
 
         self.env_dir = Path(self.config.env_root) / self.config.name
-        self.encoder_name = encoder.__class__.__name__
         self.ckpt_dir = self.env_dir / self.config.ckpt_dir_name / self.encoder_name
         self.encoded_tar_dir = self.env_dir / self.config.embedding_dir_name / self.encoder_name
+        self.encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
         self.ckpt_path = self.ckpt_dir / self.config.ckpt_name
         mkdir_if_not_exists(self.encoded_tar_dir)
 
@@ -139,21 +132,34 @@ class XaresTask:
 
         self.label_processor = self.config.label_processor
 
-    def make_encoded_tar(self):
         self.encoded_tar_path_of_split = {
             split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
             for split in self.config.encoded_tar_name_of_split
         }
 
-        encoded_ready_path = self.encoded_tar_dir / self.config.xares_settings.encoded_ready_filename
-        if not self.config.force_encode and encoded_ready_path.exists():
-            logger.info(f"Skip making encoded tar.")
+    def download_audio_tar(self):
+        if self.config.private:
+            logger.warning(f"Dataset {self.config.name} is private. Do not download from Zenodo.")
+            return
+
+        audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
+        if not self.config.force_download and audio_ready_path.exists():
+            logger.warning(f"Skip downloading audio tar: {audio_ready_path} exists.")
+            return
+
+        download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
+        audio_ready_path.touch()
+
+    def make_encoded_tar(self):
+        if not self.config.force_encode and self.encoded_ready_path.exists():
+            logger.warning(f"Skip encoding: {self.encoded_ready_path} exists.")
             return
 
         audio_ready_path = self.env_dir / self.config.xares_settings.audio_ready_filename
         if not audio_ready_path.exists():
             if self.config.private:
-                raise ValueError("For private dataset, audio tar must be provided at local path.")
+                logger.warning(f"For private dataset {self.config.name}, data must be placed at local path. Skip.")
+                return
             download_zenodo_record(self.config.zenodo_id, self.env_dir, force_download=self.config.force_download)
             audio_ready_path.touch()
 
@@ -162,7 +168,6 @@ class XaresTask:
             for split in self.config.audio_tar_name_of_split
         }
 
-
         for split in audio_tar_path_of_split:
             logger.info(f"Encoding audio for split {split} ...")
             logger.debug(f"Using data from {audio_tar_path_of_split[split]} ... ")
@@ -170,35 +175,59 @@ class XaresTask:
                 [audio_tar_path_of_split[split]],
                 target_sample_rate=self.encoder.sampling_rate,
                 audio_key_name="audio",
-                num_workers=self.config.num_encoder_workers,
+                num_workers=(
+                    0
+                    if (mp.current_process().daemon or mp.get_start_method() != "fork")
+                    else self.config.num_encoder_workers
+                ),
                 batch_size=self.config.batch_size_encode,
                 crop_length=self.config.crop_length,
-                pad_last=True, # Add crop
+                pad_last=True,  # Add crop
             )
             sink = wds.ShardWriter(
-                self.encoded_tar_path_of_split[split].as_posix().replace("*", f"{accelerator.process_index}0%05d"),
+                self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0%05d"),
                 encoder=False,
                 compress=False,
                 maxcount=self.config.save_encoded_per_batches,
                 verbose=False,
             )
 
-            with torch.inference_mode(), accelerator.autocast():
-                for enum_item,((audio, audio_length), json_data, filenames) in tqdm(enumerate(dl), desc=f"Encoding {split}", leave=True, disable=not accelerator.is_main_process):
-                    audio = audio.to(accelerator.device)
+            with torch.inference_mode():
+                for enum_item, ((audio, _), json_data, filenames) in tqdm(
+                    enumerate(dl), desc=f"Encoding {split}", leave=True
+                ):
+                    audio = audio.to(self.encoder_device)
                     embedding = self.encoder(audio).to("cpu").detach()
                     for embed, json_data_sample, filename in zip(embedding, json_data, filenames):
                         buf = io.BytesIO()
-                        np.save(buf,embed.numpy())
-                        sink.write({"npy": buf.getvalue(), 'json': json.dumps(json_data_sample).encode('utf-8'), '__key__': f"{filename}{enum_item}"})
+                        np.save(buf, embed.numpy())
+                        sink.write(
+                            {
+                                "npy": buf.getvalue(),
+                                "json": json.dumps(json_data_sample).encode("utf-8"),
+                                "__key__": f"{filename}{enum_item}",
+                            }
+                        )
 
-        if accelerator.is_main_process:
-            encoded_ready_path.touch()
+        self.encoded_ready_path.touch()
 
-    def run_mlp(self) -> float:
+    def run_mlp(self) -> Tuple[float, int]:
+        mlp_score = 0
+        eval_size = 0
+        score_file = self.ckpt_dir / "mlp_score.txt"
+
+        if score_file.exists():
+            with open(score_file, "r") as f:
+                lines = f.read().splitlines()
+                mlp_score = float(lines[0])
+                eval_size = int(lines[1])
+            logger.info(f"Loaded MLP score from {score_file}: {mlp_score}")
+            return mlp_score, eval_size
+
         if self.config.k_fold_splits:
             # K-fold cross validation
             acc = []
+            eval_sizes = []
             splits = self._make_splits()
             wds_encoded_training_fold_k = {
                 k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
@@ -211,35 +240,37 @@ class XaresTask:
                     wds_encoded_training_fold_k[k],
                     [self.encoded_tar_path_of_split[k].as_posix()],
                 )
-                acc.append(
-                    self.evaluate_mlp(
-                        [self.encoded_tar_path_of_split[k].as_posix()], metric=self.config.metric, load_ckpt=True
-                    )
-                )
+                score, eval_size = self.evaluate_mlp([self.encoded_tar_path_of_split[k].as_posix()], load_ckpt=True)
+                acc.append(score)
+                eval_sizes.append(eval_size)
 
             for k in range(len(splits)):
-                logger.info(f"Fold {k+1} accuracy: {acc[k]}")
+                logger.info(f"Fold {k+1} {self.config.metric}: {acc[k]}")
 
             avg_score = np.mean(acc)
-            logger.info(f"The averaged accuracy of 5 folds is: {avg_score}")
+            total_eval_size = int(np.average(eval_sizes))
+            logger.info(f"The averaged {self.config.metric} of 5 folds is: {avg_score}")
 
-            return avg_score
-
+            mlp_score = avg_score
+            eval_size = total_eval_size
         else:
             # Single split
             self.train_mlp(
                 [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
                 [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
             )
-            acc = self.evaluate_mlp(
+            score = self.evaluate_mlp(
                 [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
-                metric=self.config.metric,
                 load_ckpt=True,
             )
-            logger.info(f"The accuracy: {acc}")
+            logger.info(f"The {self.config.metric}: {score}")
+            mlp_score, eval_size = score
 
-            score = acc
-            return score
+        with open(score_file, "w") as f:
+            f.write(f"{mlp_score}\n{eval_size}")
+        logger.info(f"Saved MLP score to {score_file}: {mlp_score}")
+
+        return mlp_score, eval_size
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
         mlp = Mlp(
@@ -253,14 +284,12 @@ class XaresTask:
             metric=self.config.metric,
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
-
         )
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
             logger.info(f"Checkpoint {self.ckpt_path} already exists. Skip training.")
             self.trainer.load_state_dict(torch.load(self.ckpt_path))
             return
-
 
         dl_train = create_embedding_webdataset(
             train_url,
@@ -278,9 +307,15 @@ class XaresTask:
             label_processor=self.label_processor,
         )
 
+        try:
+            self.trainer.run(dl_train, dl_val)
+        except RuntimeError as e:
+            if "at least one example" in str(e):
+                raise RuntimeError(f"Empty dataloader. Try delete {self.encoded_ready_path} and re-run.")
+
         self.trainer.run(dl_train, dl_val)
 
-    def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Dict[METRICS_TYPE,Any]:
+    def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Tuple[Dict[METRICS_TYPE, Any], int]:
         if self.trainer is None:
             raise ValueError("Train the model first before evaluation.")
 
@@ -297,47 +332,68 @@ class XaresTask:
             num_workers=self.config.num_validation_workers,
             label_processor=self.label_processor,
         )
-        result = self.trainer.run_inference(dl)
-        # for k,v in result.items():
-            # logger.info(f"{k}: {v}")
-        return result
+        return self.trainer.run_inference(dl)  # (result, size)
 
+    def run_knn(self) -> Tuple[float, int]:
+        knn_score = 0
+        eval_size = 0
+        if not self.config.do_knn:
+            logger.warning(f"Skip KNN evaluation for {self.config.name}.")
+            return knn_score, eval_size
 
-    def run_knn(self):
+        score_file = self.ckpt_dir / "knn_score.txt"
+
+        if score_file.exists():
+            with open(score_file, "r") as f:
+                lines = f.read().splitlines()
+                knn_score = float(lines[0])
+                eval_size = int(lines[1])
+            logger.info(f"Loaded KNN score from {score_file}: {knn_score}")
+            return knn_score, eval_size
+
         if self.config.k_fold_splits:
             # K-fold cross validation
-            score = []
+            scores = []
+            eval_sizes = []
             splits = self._make_splits()
             wds_encoded_training_fold_k = {
                 k: [self.encoded_tar_path_of_split[j].as_posix() for j in splits if j != k] for k in splits
             }
 
             for k in splits:
-                score.append(
-                self.train_knn(
+                score, size = self.train_and_eval_knn(
                     wds_encoded_training_fold_k[k],
                     [self.encoded_tar_path_of_split[k].as_posix()],
-                ))
+                )
+                scores.append(score)
+                eval_sizes.append(size)
 
             for k in range(len(splits)):
-                logger.info(f"Fold {k+1} {self.config.metric}: {score[k]}")
+                logger.info(f"Fold {k+1} {self.config.metric}: {scores[k]}")
 
-            avg_score = np.mean(score)
+            avg_score = np.mean(scores)
+            total_eval_size = int(np.average(eval_sizes))
             logger.info(f"The averaged KNN {self.config.metric} of 5 folds is: {avg_score}")
 
-            return avg_score
-
+            knn_score = avg_score
+            eval_size = total_eval_size
         else:
             # Single split
-            score = self.train_knn(
+            score, size = self.train_and_eval_knn(
                 [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
                 [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
             )
             logger.info(f"The KNN score: {score}")
-            score = score
-            return score
+            knn_score = score
+            eval_size = size
 
-    def train_knn(self, train_url, eval_url):
+        with open(score_file, "w") as f:
+            f.write(f"{knn_score}\n{eval_size}")
+        logger.info(f"Saved KNN score to {score_file}: {knn_score}")
+
+        return knn_score, eval_size
+
+    def train_and_eval_knn(self, train_url, eval_url) -> Tuple[float, int]:
         dl_train = create_embedding_webdataset(
             train_url,
             tar_shuffle=2000,
@@ -354,16 +410,14 @@ class XaresTask:
             label_processor=self.label_processor,
         )
         knn_trainer = KNNTrainer(num_classes=self.config.output_dim)
-        scores = knn_trainer.train(dl_train, dl_eval)
-        return scores
+        return knn_trainer.train_and_eval(dl_train, dl_eval)
 
     def run(self):
+        self.download_audio_tar()
         self.make_encoded_tar()
         mlp_score = self.run_mlp()
         knn_score = self.run_knn()
         return mlp_score, knn_score
-
-        
 
     def _make_splits(self):
         splits = self.config.k_fold_splits or [self.config.train_split, self.config.valid_split, self.config.test_split]

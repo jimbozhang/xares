@@ -4,11 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xares"
-version = "0.0.2"
+version = "0.0.6"
 description = "eXtensive Audio Representation and Evaluation Suite"
 dependencies = [
-  "accelerate==1.2.1",
-  "fire",
   "loguru",
   "numpy<2",
   "scikit-learn==1.6.0",
@@ -18,6 +16,7 @@ dependencies = [
   "pandas",
   "pytorch-ignite==0.5.1",
   "pyyaml",
+  "soundfile",
   "tqdm",
   "webdataset==0.2.100",
   "pysoundfile",
@@ -25,10 +24,11 @@ dependencies = [
 authors = [
   {name = "Junbo Zhang", email = "zhangjunbo1@xiaomi.com"},
   {name = "Heinrich Dinkel", email = "dinkelheinrich@xiaomi.com"},
+  {name = "Yadong Niu", email = "niuyadong@xiaomi.com"},
   {name = "Chenyu Liu", email = "liuchenyu3@xiaomi.com"},
 ]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 
 [project.urls]

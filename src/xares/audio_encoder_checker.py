@@ -19,6 +19,23 @@ def check_audio_encoder(encoder: torch.nn.Module):
         logger.error("Encoder must have a 'sampling_rate' attribute")
         return False
 
+    if not hasattr(encoder, "hop_size_in_ms"):
+        logger.error("Encoder must have a 'hop_size_in_ms' attribute")
+        print(
+            """
+            hop_size_in_ms determines the time shift (in milliseconds) between consecutive frames in the encoded output.
+
+            For example:
+            - If input size is (B=1, T=50000) and output size is (B=1, T'=78, D), with a sampling rate of 16000 Hz:
+            - Input duration = 50000 / 16000 = 3125 ms.
+            - hop_size_in_ms ≈ 3125 / 78 ≈ 40 ms.
+            - This means the encoder shifts 40 ms forward for each frame.
+
+            It directly impacts the relationship between input length and output frames.
+            """
+        )
+        return False
+
     sample_audio = torch.randn(2, 50000)
     try:
         encoded_audio = encoder(sample_audio)
@@ -42,5 +59,4 @@ def check_audio_encoder(encoder: torch.nn.Module):
         logger.error(f"Expected output_dim={encoder.output_dim} for encoded_audio, got {encoded_audio.size(2)}")
         return False
 
-    logger.info("Encoder check passed.")
     return True

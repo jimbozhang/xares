@@ -169,6 +169,10 @@ cython_debug/
 # Debug
 debug*
 
-# Output
+# Pretrained
+facebook
+openai
 pretrained/
+
+# Output
 checkpoints/

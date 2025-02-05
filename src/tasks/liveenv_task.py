@@ -1,7 +1,7 @@
 from xares.task import TaskConfig
 
 
-def liveenv_config(**kwargs) -> TaskConfig:
+def liveenv_config(encoder) -> TaskConfig:
     data_key = "soundevent"
     class_label_maps = {
         "Airplane": 0,
@@ -34,21 +34,15 @@ def liveenv_config(**kwargs) -> TaskConfig:
         "Water": 27,
     }
 
-    config_params = {
-        "name": "liveenv",
-        "private": True,
-        "batch_size_train": 64,
-        "learning_rate": 1e-3,
-        "train_split": "liveenv_train",
-        "valid_split": "liveenv_test",
-        "test_split": "liveenv_test",
-        "output_dim": len(class_label_maps),
-        "label_processor": lambda x: class_label_maps[x[data_key]],
-        "epochs": 50,
-    }
-
-    config_params.update(kwargs)
-
-    task_config = TaskConfig(**config_params)
-
-    return task_config
+    return TaskConfig(
+        name="liveenv",
+        private=True,
+        train_split="liveenv_train",
+        valid_split="liveenv_test",
+        test_split="liveenv_test",
+        output_dim=len(class_label_maps),
+        label_processor=lambda x: class_label_maps[x[data_key]],
+        do_knn=False,
+        epochs=50,
+        encoder=encoder,
+    )

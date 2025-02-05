@@ -7,6 +7,7 @@ class DashengEncoder(torch.nn.Module):
         super().__init__()
         self.sampling_rate = 16000
         self.output_dim = 768
+        self.hop_size_in_ms = 40
         self.model = dasheng_base()
 
     def forward(self, audio: torch.Tensor):
@@ -24,4 +25,4 @@ if __name__ == "__main__":
     from xares.audio_encoder_checker import check_audio_encoder
 
     encoder = DashengEncoder()
-    check_audio_encoder(encoder)
+    assert check_audio_encoder(encoder)

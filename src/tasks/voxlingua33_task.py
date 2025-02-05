@@ -1,7 +1,9 @@
+from loguru import logger
+
 from xares.task import TaskConfig
 
 
-def voxlingua33_config(**kwargs) -> TaskConfig:
+def voxlingua33_config(encoder) -> TaskConfig:
     class_label_maps = {
         "uk": 0,
         "zh": 1,
@@ -38,20 +40,23 @@ def voxlingua33_config(**kwargs) -> TaskConfig:
         "sr": 32,
     }
 
-    config_params = {
-        "name": "voxlingua33",
-        "batch_size_train": 64,
-        "learning_rate": 1e-3,
-        "train_split": "train_subset",
-        "test_split": "dev",
-        "valid_split": "dev",
-        "zenodo_id": "TODO",
-        "output_dim": len(class_label_maps),
-        "epochs": 50,
-    }
+    config = TaskConfig(
+        name="voxlingua33",
+        encoder=encoder,
+        batch_size_train=64,
+        learning_rate=1e-3,
+        train_split="train_subset",
+        test_split="dev",
+        valid_split="dev",
+        zenodo_id="14723799",
+        output_dim=len(class_label_maps),
+        epochs=10,
+        crop_length=10,
+        label_processor=lambda x: class_label_maps[x["labels"]],
+    )
 
-    config_params.update(kwargs)
+    if config.use_mini_dataset:
+        logger.warning(f"Dataset {config.name} uses mini version for faster evaluation.")
+        config.audio_tar_name_of_split[config.train_split] = "train_subset_2k_00000{00..01}.tar"
 
-    task_config = TaskConfig(**config_params)
-
-    return task_config
+    return config

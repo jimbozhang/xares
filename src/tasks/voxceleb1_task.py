@@ -1,7 +1,9 @@
+from loguru import logger
+
 from xares.task import TaskConfig
 
 
-def voxceleb1_config(**kwargs) -> TaskConfig:
+def voxceleb1_config(encoder) -> TaskConfig:
     class_label_maps = {
         "id10003": 0,
         "id10004": 1,
@@ -1255,17 +1257,20 @@ def voxceleb1_config(**kwargs) -> TaskConfig:
         "id11250": 1249,
         "id11251": 1250,
     }
-    config_params = {
-        "name": "voxceleb1",
-        "batch_size_train": 64,
-        "learning_rate": 1e-3,
-        "train_split": "voxceleb1_train",
-        "test_split": "voxceleb1_test",
-        "valid_split": "voxceleb1_valid",
-        "zenodo_id": "TODO",
-        "output_dim": len(class_label_maps),
-        "epochs": 50,
-    }
-    config_params.update(kwargs)
-    task_config = TaskConfig(**config_params)
-    return task_config
+    config = TaskConfig(
+        name="voxceleb1",
+        train_split="voxceleb1_train",
+        test_split="voxceleb1_test",
+        valid_split="voxceleb1_valid",
+        zenodo_id="14725363",
+        epochs=5,
+        output_dim=len(class_label_maps),
+        label_processor=lambda x: class_label_maps[x["speakerid"]],
+        encoder=encoder,
+    )
+
+    if config.use_mini_dataset:
+        config.audio_tar_name_of_split[config.train_split] = "voxceleb1_train_00000{00..02}.tar"
+        logger.warning(f"Dataset {config.name} uses mini version for faster evaluation.")
+
+    return config

@@ -1,7 +1,7 @@
 from xares.task import TaskConfig
 
 
-def fluentspeechcommands_config(**kwargs) -> TaskConfig:
+def fluentspeechcommands_config(encoder) -> TaskConfig:
     data_key = "transcription"
     class_label_maps = {
         "Change language": 0,
@@ -254,20 +254,13 @@ def fluentspeechcommands_config(**kwargs) -> TaskConfig:
         "OK now switch the main language to German": 247,
     }
 
-    config_params = {
-        "name": "fluentspeechcommands",
-        "batch_size_train": 64,
-        "learning_rate": 1e-3,
-        "train_split": "fluentspeechcommands_train",
-        "valid_split": "fluentspeechcommands_valid",
-        "test_split": "fluentspeechcommands_test",
-        "zenodo_id": "TODO",
-        "output_dim": len(class_label_maps),
-        "epochs": 50,
-        "label_processor": lambda x: class_label_maps[x[data_key]],
-    }
-
-    config_params.update(kwargs)
-
-    config = TaskConfig(**config_params)
-    return config
+    return TaskConfig(
+        name="fluentspeechcommands",
+        encoder=encoder,
+        train_split="fluentspeechcommands_train",
+        valid_split="fluentspeechcommands_valid",
+        test_split="fluentspeechcommands_test",
+        zenodo_id="14722453",
+        output_dim=len(class_label_maps),
+        label_processor=lambda x: class_label_maps[x[data_key]],
+    )
