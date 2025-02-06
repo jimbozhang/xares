@@ -18,7 +18,7 @@ def clotho_config(encoder) -> TaskConfig:
         test_split="clotho_validation", # Worst naming scheme in a dataset
         valid_split="clotho_evaluation",
         zenodo_id="TODO",
-        metric="recallatk",
+        metric="recallatk_r1",
         task_type="contrastive",
         merge_processor=data_merge_function_clotho,
         num_training_workers=4,
