@@ -77,8 +77,12 @@ def main(args):
     stage_0 = partial(worker, do_download=True)
     if args.from_stage <= 0:
         try:
-            with mp.Pool(processes=args.max_jobs) as pool:
-                pool.starmap(stage_0, [(None, task_py) for task_py in args.tasks_py])
+            if enable_multiprocessing:
+                with mp.Pool(processes=args.max_jobs) as pool:
+                    pool.starmap(stage_0, [(None, task_py) for task_py in args.tasks_py])
+            else:
+                for task_py in args.tasks_py:
+                    stage_0(None, task_py)
             logger.info("Stage 0 completed: All data downloaded.")
         except Exception as e:
             if "Max retries exceeded with url" in str(e):

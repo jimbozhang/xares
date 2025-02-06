@@ -17,7 +17,8 @@ X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It i
 - [x] VocalSound
 - [x] CREMA-D
 - [x] RAVDESS
-- [ ] LibriSpeech-Phoneme
+- [ ] LibriSpeech-ASR
+- [ ] speechocean762
 - [x] ASV2015
 
 ### Environment
@@ -104,9 +105,9 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | speechcommandsv1             | **0.967** | 0.805    | 0.955     | 0.930     |
 | urbansound8k                 | **0.835** | 0.676    | 0.719     | 0.443     |
 | vocalsound                   | **0.910** | 0.791    | 0.871     | 0.807     |
-| voxceleb1 (mini)             | **0.159** | 0.020    | 0.088     | 0.031     |
-| voxlingua33 (mini)           | 0.411     | 0.050    | **0.419** | 0.345     |
-| **Weighted Average**         | **0.640** | 0.479    | 0.588     | 0.533     |
+| voxceleb1 (mini)             | **0.512** | 0.069    | 0.215     | 0.043     |
+| voxlingua33 (mini)           | 0.782     | 0.492    | **0.862** | 0.577     |
+| **Weighted Average**         | **0.728** | 0.500    | 0.629     | 0.541     |
 
 ---
 
@@ -127,9 +128,9 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | speechcommandsv1              | **0.903** | 0.208    | 0.096     | 0.850     |
 | urbansound8k                  | **0.662** | 0.334    | 0.214     | 0.153     |
 | vocalsound                    | **0.336** | 0.265    | 0.417     | 0.295     |
-| voxceleb1 (mini)              | **0.016** | 0.001    | 0.007     | 0.001     |
-| voxlingua33 (mini)            | **0.222** | 0.017    | 0.207     | 0.095     |
-| **Weighted Average**          | **0.372** | 0.224    | 0.251     | 0.351     |
+| voxceleb1 (mini)              | **0.035** | 0.002    | 0.007     | 0.001     |
+| voxlingua33 (mini)            | **0.340** | 0.014    | 0.207     | 0.050     |
+| **Weighted Average**          | **0.384** | 0.271    | 0.251     | 0.350     |
 
 ## Run with your own pretrained audio encoder
 
