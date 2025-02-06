@@ -15,7 +15,7 @@ def clotho_config(encoder) -> TaskConfig:
         name="clotho",
         criterion="AudioTextContrastiveLoss",
         train_split="clotho_development",
-        test_split="clotho_validation", # Worst naming scheme in a dataset
+        test_split="clotho_validation",  # Worst naming scheme in a dataset
         valid_split="clotho_evaluation",
         zenodo_id="TODO",
         metric="recallatk_r1",
@@ -24,6 +24,7 @@ def clotho_config(encoder) -> TaskConfig:
         num_training_workers=4,
         epochs=20,
         crop_length=30,
+        do_knn=False,
         save_encoded_per_batches=500,
     )
     return task_config

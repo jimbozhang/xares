@@ -75,6 +75,7 @@ class TaskConfig:
     model: nn.Module | None = None
     output_dim: int | None = None
     metric: METRICS_TYPE = "accuracy"
+    metric_args: Dict[str, Any] = field(default_factory=lambda: dict())
 
     # KNN
     do_knn: bool = True
@@ -265,12 +266,11 @@ class XaresTask:
                 [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
                 [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
             )
-            score = self.evaluate_mlp(
+            mlp_score, eval_size = self.evaluate_mlp(
                 [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
                 load_ckpt=True,
             )
-            logger.info(f"The {self.config.metric}: {score}")
-            mlp_score, eval_size = score
+            logger.info(f"The {self.config.metric}: {mlp_score}")
 
         with open(score_file, "w") as f:
             f.write(f"{mlp_score}\n{eval_size}")
@@ -288,6 +288,7 @@ class XaresTask:
             ckpt_dir=self.ckpt_dir,
             ckpt_name=self.config.ckpt_name,
             metric=self.config.metric,
+            metric_args=self.config.metric_args,
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
             task_type=self.config.task_type,
@@ -321,8 +322,6 @@ class XaresTask:
         except RuntimeError as e:
             if "at least one example" in str(e):
                 raise RuntimeError(f"Empty dataloader. Try delete {self.encoded_ready_path} and re-run.")
-
-        self.trainer.run(dl_train, dl_val)
 
     def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Tuple[Dict[METRICS_TYPE, Any], int]:
         if self.trainer is None:

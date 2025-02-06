@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import InitVar, dataclass, field
-from typing import Callable, Dict, Iterable, Literal, Tuple
+from typing import Any, Callable, Dict, Iterable, Literal, Tuple
 
 import torch
 import torch.nn as nn
@@ -78,6 +78,7 @@ class Trainer:
     best_ckpt_path: str | None = None
     ckpt_name: str = "best_model.pt"
     metric: METRICS_TYPE = "accuracy"
+    metric_args: Dict[str, Any] = field(default_factory=lambda: dict())
     label_name: str = "target"
     save_model: bool = True
     decay_fraction: float = 0.1  # Decay learning rate
@@ -134,7 +135,7 @@ class Trainer:
 
     def run_inference(self, dl_eval):
         local_evaluator = self.ignite_evaluator
-        eval_metric = self._metric_obj.metric()
+        eval_metric = self._metric_obj.metric(**self.metric_args)
         eval_metric.attach(local_evaluator, self.metric)
         local_evaluator.run(dl_eval)
 
@@ -142,7 +143,7 @@ class Trainer:
         return local_evaluator.state.metrics[self.metric], dl_eval_size
 
     def run(self, dl_train, dl_dev):
-        metrics = {"loss": Loss(self.model.criterion), self.metric: self._metric_obj.metric()}
+        metrics = {"loss": Loss(self.model.criterion), self.metric: self._metric_obj.metric(**self.metric_args)}
         for name, metric in metrics.items():
             metric.attach(self.ignite_evaluator, name)
 

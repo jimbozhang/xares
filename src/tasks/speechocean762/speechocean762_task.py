@@ -14,8 +14,8 @@ class Speechocean762Task(TaskBase):
             metric="MSE",
             criterion="MSELoss",
             epochs=20,
-            batch_size_encode=1, # Just avoid padding for this task
-            label_processor=lambda x: float(x[data_key])
+            batch_size_encode=1,  # Just avoid padding for this task
+            label_processor=lambda x: float(x[data_key]),
         )
         super().__init__(encoder, config=task_config)
 
@@ -24,4 +24,3 @@ class Speechocean762Task(TaskBase):
 
     def make_encoded_tar(self):
         self.default_make_encoded_tar()
-

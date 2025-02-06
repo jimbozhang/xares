@@ -1,5 +1,7 @@
 from math import ceil
+
 import torch
+
 from xares.task import TaskConfig
 
 
@@ -117,10 +119,11 @@ def maestro_config(encoder) -> TaskConfig:
         task_type="frame",
         output_dim=len(class_label_maps),
         criterion="BCEWithLogitsLoss",
-        metric="binary_accuracy",
-        epochs=5,
+        metric="segmentf1",
+        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms, segment_length_in_s=0.1),
+        epochs=50,
         batch_size_encode=1,  # Long samples
-        batch_size_train=8,
+        batch_size_train=1,  # Samples are very long, avoid extreme padding
         label_processor=label_processor,
     )
     return config

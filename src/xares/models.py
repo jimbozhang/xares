@@ -1,9 +1,11 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 class Mlp(nn.Module):
     def __init__(self, in_features, out_features: int | None = None, criterion="CrossEntropyLoss"):
@@ -87,8 +89,7 @@ class RetrivalMLP(nn.Module):
         model_inputs = text_inputs.to(x.device)
         text_embeddings = self.text_model(model_inputs.input_ids)
         text_embeddings = self.text_mlp(text_embeddings)
-        outputmask = (model_inputs.input_ids
-                != self.pad_token_id).unsqueeze(-1).float()
+        outputmask = (model_inputs.input_ids != self.pad_token_id).unsqueeze(-1).float()
         text_embeddings = (text_embeddings * outputmask).sum(1) / outputmask.sum(1)
         x = self.ln(x)
         x = self.audio_mlp(x)
