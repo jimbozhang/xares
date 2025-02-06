@@ -20,6 +20,7 @@ def fast_warn_and_continue(exn):
     warnings.warn(repr(exn))
     return True
 
+
 def crop_or_pad_audio(wav: torch.Tensor, crop_size: int, pad_last: bool = False):
     n_samples, *_ = wav.shape
     available_crops = n_samples // crop_size
@@ -57,6 +58,7 @@ def _seq_crop_audio(
 
         for crop in crops:
             yield (crop, *extra)
+
 
 class Audiowebdataset(wds.DataPipeline):
 
@@ -125,7 +127,6 @@ class Audiowebdataset(wds.DataPipeline):
                 wds.to_tuple(*rename_keys.keys()),
             ]
         )
-
 
         if merge_function is not None:
             pipeline.extend([merge_function])

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from typing import Callable, Dict, Iterable, Literal, Tuple
 
 import torch
@@ -30,31 +30,46 @@ def masked_mean(x, x_length, dim: int = -1):
 
 
 def cast_to_tensor(y: Iterable):
-    y = torch.tensor(y) if not isinstance(y, torch.Tensor) else y
+    y = y if isinstance(y, torch.Tensor) else torch.tensor(y)
     return y.float() if y.is_floating_point() else y
 
 
-def prepare_wds_batch_default(batch: Tuple, device: torch.device | str = "cpu"):
+def pad_or_trim(tensor, target_size):
+    difference = target_size - tensor.shape[-1]
+    if difference < 0:
+        return tensor[..., :target_size].contiguous()  # Trim excess values
+    elif difference > 0:
+        return torch.nn.functional.pad(tensor, pad=(0, difference))
+    return tensor
+
+
+def prepare_clip_task_batch(batch: Tuple, device: torch.device | str = "cpu"):
     (x, x_length), y, _ = batch
     x = masked_mean(x, x_length=x_length, dim=-1)
     y = cast_to_tensor(y)
     return x.to(device), y.to(device)
 
 
-def default_validation_func(model: torch.nn.Module, device: torch.device | str = "cpu") -> Callable:
-    def validation_step(engine: Engine, batch: Tuple) -> Tuple[Tensor, Tensor]:
-        model.eval()
-        with torch.inference_mode():
-            y_pred, y = model(*prepare_wds_batch_default(batch, device), return_loss=False)
-            return y_pred, y
+def prepare_contrastive_task_batch(batch: Tuple, device: torch.device | str = "cpu"):
+    (x, x_length), y, _ = batch
+    # y is a list of strings
+    x = masked_mean(x, x_length=x_length, dim=-1)
+    # x, y are (B,D,T), but models need B,T,D
+    return x.to(device), y
 
-    return validation_step
+
+def prepare_frame_task_batch(batch: Tuple, device: torch.device | str = "cpu"):
+    (x, x_length), (y, y_length), _ = batch
+    y = cast_to_tensor(y)
+    # Trim the labels
+    y = pad_or_trim(y, x.shape[-1])
+    # x, y are (B,D,T), but models need B,T,D
+    return x.transpose(-2, -1).contiguous().to(device), y.transpose(-2, -1).contiguous().to(device)
 
 
 @dataclass
 class Trainer:
     model: nn.Module
-    validation_func: Callable | None = None
     device: torch.device | Literal["cpu"] = field(default_factory=lambda: torch.device("cpu"))
     optimizer: str = "Adam"
     lr: float = 3e-3
@@ -66,24 +81,33 @@ class Trainer:
     label_name: str = "target"
     save_model: bool = True
     decay_fraction: float = 0.1  # Decay learning rate
+    task_type: InitVar[Literal["frame", "clip", "contrastive"]] = "clip"
 
-    def __post_init__(self):
+    def __post_init__(self, task_type: Literal["frame", "clip", "contrastive"] = "clip"):
         try:
             self.optimizer = getattr(optim, self.optimizer)(self.model.parameters(), lr=self.lr)
         except AttributeError:
             raise NotImplementedError(f"Optimizer {self.optimizer} not implemented.")
 
+        if task_type == "clip":
+            self.prepare_batch_function = prepare_clip_task_batch
+        elif task_type == "frame":
+            self.prepare_batch_function = prepare_frame_task_batch
+        elif task_type == "contrastive":
+            self.prepare_batch_function = prepare_contrastive_task_batch
+
         self.ignite_trainer = Engine(self.train_step)
-        self.ignite_evaluator = Engine(
-            default_validation_func(self.model, device=self.device)
-            if self.validation_func is None
-            else self.validation_func(self.model, device=self.device)
-        )
+        self.ignite_evaluator = Engine(self.validation_step)
         # Schedule cosine annealing during training
-        scheduler = CosineAnnealingScheduler(
-            self.optimizer, "lr", self.optimizer.param_groups[0]["lr"], self.lr * self.decay_fraction, self.max_epochs
-        )
-        self.ignite_trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
+        if self.max_epochs > 1:
+            scheduler = CosineAnnealingScheduler(
+                self.optimizer,
+                "lr",
+                self.optimizer.param_groups[0]["lr"],
+                self.lr * self.decay_fraction,
+                self.max_epochs,
+            )
+            self.ignite_trainer.add_event_handler(Events.EPOCH_STARTED, scheduler)
 
         self.model = self.model.to(self.device)
         self._metric_obj = ALL_METRICS[self.metric]
@@ -97,10 +121,16 @@ class Trainer:
         self.model.train()
         with torch.enable_grad():
             self.optimizer.zero_grad()
-            loss = self.model(*prepare_wds_batch_default(batch, self.device), return_loss=True)
+            loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
             loss.backward()
             self.optimizer.step()
             return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
+
+    def validation_step(self, engine: Engine, batch: Tuple) -> Tuple[Tensor, Tensor]:
+        self.model.eval()
+        with torch.inference_mode():
+            y_pred, y = self.model(*self.prepare_batch_function(batch, self.device), return_loss=False)
+            return y_pred, y
 
     def run_inference(self, dl_eval):
         local_evaluator = self.ignite_evaluator
@@ -108,7 +138,7 @@ class Trainer:
         eval_metric.attach(local_evaluator, self.metric)
         local_evaluator.run(dl_eval)
 
-        dl_eval_size = sum(1 for _ in dl_eval)
+        dl_eval_size = local_evaluator.state.iteration
         return local_evaluator.state.metrics[self.metric], dl_eval_size
 
     def run(self, dl_train, dl_dev):
@@ -198,9 +228,8 @@ class KNNTrainer:
 
     def __post_init__(self):
         self._metric_obj = ALL_METRICS[self.metric]
-        self.trainer = Engine(lambda engine, batch: prepare_wds_batch_default(batch))
+        self.trainer = Engine(lambda engine, batch: prepare_clip_task_batch(batch))
         ProgressBar(bar_format=None).attach(self.trainer)
-        # self.evaluate_engine = Engine(lambda batch:)
         EpochOutputStore().attach(self.trainer, "output")
 
     def train_and_eval(self, dl_train, dl_eval) -> Tuple[float, int]:
@@ -211,7 +240,7 @@ class KNNTrainer:
         knn_model = KNN(train_data, train_labels, nb_knn=self.nb_knn, num_classes=self.num_classes, T=self.temperature)
 
         def test_step(engine, batch):
-            x, y = prepare_wds_batch_default(batch)
+            x, y = prepare_clip_task_batch(batch)
             return knn_model(x), y
 
         eval_engine = Engine(test_step)
@@ -231,9 +260,10 @@ if __name__ == "__main__":
     train_x = torch.randn(1000, 64)
     targets = torch.empty(1000).random_(10).long()
     test_x = torch.randn(100, 64)
+    print(pad_or_trim(train_x, 65).shape)
 
-    model = KNN(train_x, targets, nb_knn=[10, 20, 50], num_classes=10)
+    # model = KNN(train_x, targets, nb_knn=[10, 20, 50], num_classes=10)
 
-    y = model(test_x)
-    for k, v in y.items():
-        print(k, v.shape)
+    # y = model(test_x)
+    # for k, v in y.items():
+    # print(k, v.shape)

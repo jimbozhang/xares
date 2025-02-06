@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import partial
 from typing import Callable, Dict, List, Literal, Tuple
+
 import numpy as np
 import torch
-from ignite.metrics import Accuracy, AveragePrecision, EpochMetric, MeanAbsoluteError, MeanSquaredError, Metric
+from ignite.metrics import ROC_AUC, Accuracy, AveragePrecision, EpochMetric, MeanAbsoluteError, MeanSquaredError, Metric
 
-METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk", "MAE", "MSE"]
+METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk_r1", "MAE", "MSE", "binary_accuracy"]
 
 
 @dataclass
@@ -72,10 +74,14 @@ EERMetric = lambda: EpochMetric(compute_fn=compute_eer)
 
 ALL_METRICS: Dict[METRICS_TYPE, EvalMetric] = dict(
     accuracy=EvalMetric(Accuracy, score=1.0),
+    binary_accuracy=EvalMetric(
+        partial(Accuracy, output_transform=lambda x: (torch.round(torch.sigmoid(x[0])), x[1]), is_multilabel=True),
+        score=1.0,
+    ),
     mAP=EvalMetric(AveragePrecision, score=1.0),
     MAE=EvalMetric(MeanAbsoluteError, score=-1.0),
     MSE=EvalMetric(MeanSquaredError, score=-1.0),
-    recallatk=EvalMetric(CLAPScore, score=1.0),
+    recallatk_r1=EvalMetric(partial(CLAPScore, select = 'r1'), score=1.0),
     EER=EvalMetric(EERMetric, score=-1.0),
 )
 
@@ -115,7 +121,7 @@ def clap_metrics(
         preds = torch.where(ranking == ground_truth)[1]
         # Calcualte map@10
         ranks = np.sort(preds.view(-1, num_caps).cpu().numpy() + 1, axis=-1)
-        if name == 'a2t':
+        if name == "a2t":
             ap = np.arange(1, num_caps + 1) / ranks
         else:
             ap = 1.0 / ranks

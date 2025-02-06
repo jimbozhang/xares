@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class Mlp(nn.Module):
     def __init__(self, in_features, out_features: int | None = None, criterion="CrossEntropyLoss"):
@@ -61,27 +63,35 @@ class RetrivalMLP(nn.Module):
         criterion="AudioTextContrastiveLoss",
     ):
         super().__init__()
-        out_features = out_features or in_features
+        out_features = out_features or hidden_features
         from transformers import AutoTokenizer
 
         self.ln = nn.LayerNorm(in_features)
         self.audio_mlp = nn.Sequential(
             nn.Linear(in_features, hidden_features), nn.GELU(), nn.Linear(hidden_features, out_features)
         )
-        self.text_embedding = AutoTokenizer.from_pretrained("bert-base-uncased")
+        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        self.text_model = torch.nn.Embedding(self.tokenizer.vocab_size, hidden_features)
+        self.pad_token_id = self.tokenizer.pad_token_id
+
         self.text_mlp = nn.Sequential(
-            nn.Linear(text_dim, hidden_features), nn.GELU(), nn.Linear(hidden_features, out_features)
+            nn.Linear(hidden_features, hidden_features),
+            nn.GELU(),
+            nn.Linear(hidden_features, out_features),
         )
 
-        self.criterion = AudioTextContrastiveLoss()
+        self.criterion = globals()[criterion]()
 
-    def forward(self, x: torch.Tensor, text: torch.Tensor | None = None, return_loss: bool = False):
+    def forward(self, x: torch.Tensor, text: torch.Tensor, return_loss: bool = False):
         text_inputs = self.tokenizer(text, return_tensors="pt", padding=True)
         model_inputs = text_inputs.to(x.device)
-        text_embeddings = self.text_model(**model_inputs)
-
+        text_embeddings = self.text_model(model_inputs.input_ids)
+        text_embeddings = self.text_mlp(text_embeddings)
+        outputmask = (model_inputs.input_ids
+                != self.pad_token_id).unsqueeze(-1).float()
+        text_embeddings = (text_embeddings * outputmask).sum(1) / outputmask.sum(1)
         x = self.ln(x)
-        x = self.fc(x)
-        if text is not None and return_loss:
+        x = self.audio_mlp(x)
+        if return_loss:
             return self.criterion(x, text_embeddings)
         return x, text_embeddings
