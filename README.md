@@ -71,7 +71,7 @@ Alternatively, you can run tasks from within Python. Here is an example of runni
 >>> from tasks.asvspoof_task import asvspoof2015_config
 >>> from xares.task import XaresTask
 
->>> task = XaresTask(encoder=DashengEncoder(), config=asvspoof2015_config())
+>>> task = XaresTask(config=asvspoof2015_config(encoder=DashengEncoder()))
 >>> task.run()
 ```
 
