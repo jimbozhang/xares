@@ -120,7 +120,7 @@ def maestro_config(encoder) -> TaskConfig:
         output_dim=len(class_label_maps),
         criterion="BCEWithLogitsLoss",
         metric="segmentf1",
-        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms, segment_length_in_s=0.1),
+        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms if encoder else 0, segment_length_in_s=0.1),
         epochs=50,
         batch_size_encode=1,  # Long samples
         batch_size_train=1,  # Samples are very long, avoid extreme padding
