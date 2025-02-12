@@ -94,6 +94,11 @@ def main(args):
             else:
                 logger.error(f"Error in stage 0 (download): {e} Must fix it before proceeding.")
                 return
+    else:
+        # Ensure pretrained model has been saved at local if stage 0 is skipped
+        for task_py in args.tasks_py:
+            worker(None, task_py)
+
     if args.to_stage == 0:
         return
 

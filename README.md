@@ -94,9 +94,11 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 |------------------------------|-----------|----------|-----------|-----------|
 | asvspoof (mini)              | **0.956** | 0.914    | 0.885     | 0.892     |
 | crema_d                      | **0.772** | 0.568    | 0.600     | 0.566     |
+| desde                        | 0.532     |          |           |           |
 | esc50                        | **0.869** | 0.579    | 0.614     | 0.249     |
 | fluentspeechcommands_kws     | 0.916     | 0.417    | 0.878     | **0.962** |
 | freemusicarchive_genre       | **0.640** | 0.518    | 0.595     | 0.360     |
+| fsd50k                       | 0.408     |          |           |           |
 | fsdkaggle2018                | **0.557** | 0.352    | 0.478     | 0.196     |
 | gtzan                        | **0.869** | 0.681    | 0.751     | 0.495     |
 | libricount                   | **0.688** | 0.605    | 0.549     | 0.507     |
@@ -105,6 +107,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | ravdess                      | **0.725** | 0.440    | 0.460     | 0.469     |
 | speechcommandsv1             | **0.967** | 0.805    | 0.955     | 0.930     |
 | urbansound8k                 | **0.835** | 0.676    | 0.719     | 0.443     |
+| vocalimiations               | 0.238     |          |           |           |
 | vocalsound                   | **0.910** | 0.791    | 0.871     | 0.807     |
 | voxceleb1 (mini)             | **0.512** | 0.069    | 0.215     | 0.043     |
 | voxlingua33 (mini)           | 0.782     | 0.492    | **0.862** | 0.577     |
@@ -128,6 +131,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | ravdess                       | **0.369** | 0.171    | 0.287     | 0.289     |
 | speechcommandsv1              | **0.903** | 0.208    | 0.096     | 0.850     |
 | urbansound8k                  | **0.662** | 0.334    | 0.214     | 0.153     |
+| vocalimiations                | 0.031     |          |           |           |
 | vocalsound                    | **0.336** | 0.265    | 0.417     | 0.295     |
 | voxceleb1 (mini)              | **0.035** | 0.002    | 0.007     | 0.001     |
 | voxlingua33 (mini)            | **0.340** | 0.014    | 0.207     | 0.050     |

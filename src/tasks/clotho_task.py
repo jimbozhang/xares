@@ -26,5 +26,6 @@ def clotho_config(encoder) -> TaskConfig:
         crop_length=30,
         do_knn=False,
         save_encoded_per_batches=500,
+        pretrained_dependencies=["bert-base-uncased:tokenizer"],
     )
     return task_config
