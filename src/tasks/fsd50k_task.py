@@ -229,5 +229,6 @@ def fsd50k_config(encoder) -> TaskConfig:
         output_dim=len(class_label_maps),
         label_processor=manyhot_label_map,
         crop_length=10,  # 10s, even though samples are 30s
+        do_knn=False,
     )
     return task_config
