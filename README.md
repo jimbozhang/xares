@@ -67,12 +67,9 @@ If the automatic download fails, you can also manually download the datasets usi
 Alternatively, you can run tasks from within Python. Here is an example of running the ASVspoof2015 task in a single process:
 
 ```python
-from xares.task import XaresTask
-from example.dasheng.dasheng_encoder import DashengEncoder
-from tasks.asvspoof_task import asvspoof2015_config
-task = XaresTask(encoder=DashengEncoder(), config=asvspoof2015_config())
-task.run()
-```
+>>> from example.dasheng.dasheng_encoder import DashengEncoder
+>>> from tasks.asvspoof_task import asvspoof2015_config
+>>> from xares.task import XaresTask
 
 
 ## Baseline Results
