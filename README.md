@@ -24,15 +24,15 @@ X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It i
 ### Environment
 
 - [x] ESC-50
-- [ ] FSD50k
+- [x] FSD50k
 - [x] UrbanSound 8k
-- [ ] DESED
+- [x] DESED
 - [x] FSD18-Kaggle
-- [ ] Clotho
+- [x] Clotho
 
 ### Music
 
-- [ ] MAESTRO
+- [x] MAESTRO
 - [x] GTZAN Genre
 - [x] NSynth
 - [x] FMA

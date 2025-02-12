@@ -46,7 +46,7 @@ def desed_config(encoder) -> TaskConfig:
         label_processor=label_transform,
         criterion="BCEWithLogitsLoss",
         metric="segmentf1",
-        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms, segment_length_in_s=1.0),
+        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms if encoder else 0, segment_length_in_s=1.0),
         task_type="frame",
         do_knn=False,
     )
