@@ -17,7 +17,7 @@ from tqdm import tqdm
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.metrics import METRICS_TYPE
-from xares.models import Mlp, RetrivalMLP
+from xares.models import Mlp, RetrivalMLP, download_model_to_local
 from xares.trainer import KNNTrainer, Trainer
 from xares.utils import download_zenodo_record, mkdir_if_not_exists
 
@@ -52,6 +52,7 @@ class TaskConfig:
     # Encoded tar
     force_encode: bool = False
     encoder: None | Any = None
+    pretrained_dependencies: None | List[str] = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
     save_encoded_per_batches: int = 2000
@@ -143,6 +144,9 @@ class XaresTask:
             split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
             for split in self.config.encoded_tar_name_of_split
         }
+
+        if self.config.pretrained_dependencies is not None:
+            download_model_to_local(self.config.pretrained_dependencies)
 
     def download_audio_tar(self):
         if self.config.private:
