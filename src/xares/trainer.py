@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import InitVar, dataclass, field
-from typing import Any, Callable, Dict, Iterable, Literal, Tuple
+from functools import partial
+from typing import Any, Dict, Iterable, Literal, Tuple
 
 import torch
 import torch.nn as nn
@@ -67,12 +68,32 @@ def prepare_frame_task_batch(batch: Tuple, device: torch.device | str = "cpu"):
     return x.transpose(-2, -1).contiguous().to(device), y.transpose(-2, -1).contiguous().to(device)
 
 
+def prepare_asr_task_batch(batch: Tuple, device: torch.device | str = "cpu", tokenizer: Any = None):
+    if tokenizer is None:
+        raise ValueError("Tokenizer must be provided for ASR task.")
+
+    from transformers import DataCollatorForLanguageModeling
+
+    (x, _), labels, _ = batch
+
+    text_with_eos_bos = [f"<|vision_end|>{label["trans"]}{tokenizer.eos_token}" for label in labels]
+    tokens = [tokenizer(text) for text in text_with_eos_bos]
+    data_collator_for_lm = DataCollatorForLanguageModeling(tokenizer, mlm=False)
+    y = data_collator_for_lm(tokens)["input_ids"]
+
+    # x are (B,D,T), but models need B,T,D
+    return x.transpose(-2, -1).contiguous().to(device), y.contiguous().to(device)
+
+
 @dataclass
 class Trainer:
     model: nn.Module
-    device: torch.device | Literal["cpu"] = field(default_factory=lambda: torch.device("cpu"))
+    device: torch.device | Literal["cpu"] = field(
+        default_factory=lambda: torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    )
     optimizer: str = "Adam"
     lr: float = 3e-3
+    gradient_accumulation_steps: int = 1
     max_epochs: int = 10
     ckpt_dir: str = "checkpoints"
     best_ckpt_path: str | None = None
@@ -96,6 +117,10 @@ class Trainer:
             self.prepare_batch_function = prepare_frame_task_batch
         elif task_type == "contrastive":
             self.prepare_batch_function = prepare_contrastive_task_batch
+        elif task_type == "asr":
+            self.prepare_batch_function = partial(prepare_asr_task_batch, tokenizer=self.model.tokenizer)
+        else:
+            raise NotImplementedError(f"Trainer.prepare_batch_function for task_type {task_type} not implemented.")
 
         self.ignite_trainer = Engine(self.train_step)
         self.ignite_evaluator = Engine(self.validation_step)
@@ -122,9 +147,13 @@ class Trainer:
         self.model.train()
         with torch.enable_grad():
             self.optimizer.zero_grad()
-            loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
+            loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True).loss
             loss.backward()
-            self.optimizer.step()
+
+            if (engine.state.iteration - 1) % self.gradient_accumulation_steps == 0:
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
             return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 
     def validation_step(self, engine: Engine, batch: Tuple) -> Tuple[Tensor, Tensor]:

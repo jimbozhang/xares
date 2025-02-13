@@ -17,9 +17,11 @@ from tqdm import tqdm
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.metrics import METRICS_TYPE
-from xares.models import Mlp, RetrivalMLP, download_model_to_local
+from xares.models.asr import AsrModelForGeneration
+from xares.models.retrival import RetrivalMLP
+from xares.models.simple import Mlp
 from xares.trainer import KNNTrainer, Trainer
-from xares.utils import download_zenodo_record, mkdir_if_not_exists
+from xares.utils import download_hf_model_to_local, download_zenodo_record, mkdir_if_not_exists
 
 
 @dataclass
@@ -27,6 +29,7 @@ class TaskConfig:
     name: str
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
     env_root: Path | str | None = None
+    disabled: bool = False  # Skip the task, useful for debugging
 
     # General
     private: bool = False
@@ -69,6 +72,7 @@ class TaskConfig:
         "CrossEntropyLoss"
     )
     batch_size_train: int = 32
+    gradient_accumulation_steps: int = 1
     learning_rate: float = 1e-3
     epochs: int = 10
     num_training_workers: int = 0
@@ -138,7 +142,12 @@ class XaresTask:
         self.label_processor = self.config.label_processor
         self.merge_processor = self.config.merge_processor
 
-        self.mlp_template = RetrivalMLP if self.config.task_type == "contrastive" else Mlp
+        if self.config.task_type == "contrastive":
+            self.mlp_model = RetrivalMLP
+        elif self.config.task_type == "asr":
+            self.mlp_model = AsrModelForGeneration
+        else:
+            self.mlp_model = Mlp
 
         self.encoded_tar_path_of_split = {
             split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
@@ -146,7 +155,7 @@ class XaresTask:
         }
 
         if self.config.pretrained_dependencies is not None:
-            download_model_to_local(self.config.pretrained_dependencies)
+            download_hf_model_to_local(self.config.pretrained_dependencies)
 
     def download_audio_tar(self):
         if self.config.private:
@@ -283,7 +292,7 @@ class XaresTask:
         return mlp_score, eval_size
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
-        mlp = self.mlp_template(
+        mlp = self.mlp_model(
             in_features=self.encoder.output_dim, out_features=self.config.output_dim, criterion=self.config.criterion
         )
 
@@ -293,6 +302,7 @@ class XaresTask:
             ckpt_name=self.config.ckpt_name,
             metric=self.config.metric,
             metric_args=self.config.metric_args,
+            gradient_accumulation_steps=self.config.gradient_accumulation_steps,
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
             task_type=self.config.task_type,

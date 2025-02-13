@@ -173,6 +173,7 @@ debug*
 facebook
 openai
 google-bert
+Qwen
 pretrained/
 
 # Output
