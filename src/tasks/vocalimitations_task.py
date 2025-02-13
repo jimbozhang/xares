@@ -314,7 +314,7 @@ def vocalimiations_config(encoder) -> TaskConfig:
         label_processor=lambda x: class_label_maps[x[task]],
         name="vocalimitations",
         output_dim=len(class_label_maps),
-        zenodo_id="14858705",
+        zenodo_id="14862060",
     )
     config.audio_tar_name_of_split = {
         fold: f"vocal_imitations_fold{fold:02}_0000000.tar" for fold in config.k_fold_splits

@@ -1266,7 +1266,7 @@ def voxceleb1_config(encoder) -> TaskConfig:
         test_split="voxceleb1_test",
         train_split="voxceleb1_train",
         valid_split="voxceleb1_valid",
-        zenodo_id="14725363",
+        zenodo_id="14811963",
     )
 
     if config.use_mini_dataset:

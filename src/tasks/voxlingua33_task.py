@@ -52,7 +52,7 @@ def voxlingua33_config(encoder) -> TaskConfig:
         test_split="dev",
         train_split="train_subset",
         valid_split="dev",
-        zenodo_id="14723799",
+        zenodo_id="14812245",
     )
 
     if config.use_mini_dataset:
