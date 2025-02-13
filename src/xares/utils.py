@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 
 from loguru import logger
 from tqdm import tqdm
@@ -101,3 +102,32 @@ def attr_from_py_path(path: str, endswith: str | None = None) -> type:
         raise ValueError(f"Expected 1 class with endswith={endswith}, got {len(attr_list)}")
 
     return getattr(module, attr_list[0])
+
+
+def download_hf_model_to_local(model_names: str | List[str], output_root: str = "."):
+    # Download the model to the local directory to avoid issues under multi-processes
+    if isinstance(model_names, str):
+        model_names = [model_names]
+
+    if "bert-base-uncased:tokenizer" in model_names:
+        model_name = "google-bert/bert-base-uncased"
+        output_path = Path(output_root) / model_name
+        if not output_path.exists():
+            from transformers import AutoTokenizer
+
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            tokenizer.save_pretrained(output_path)
+        model_names.remove("bert-base-uncased:tokenizer")
+
+    if "qwen2" in model_names:
+        model_name = "Qwen/Qwen2.5-0.5B"
+        output_path = Path(output_root) / model_name
+        if not output_path.exists():
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+
+            for m in [AutoModelForCausalLM.from_pretrained(model_name), AutoTokenizer.from_pretrained(model_name)]:
+                m.save_pretrained(output_path)
+        model_names.remove("qwen2")
+
+    if len(model_names) > 0:
+        logger.warning(f"Models {model_names} are not supported for download")

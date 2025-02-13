@@ -14,14 +14,14 @@ def fma_genre_config(encoder) -> TaskConfig:
         "Instrumental": 7,
     }
     return TaskConfig(
+        crop_length=10,  # 10s
         encoder=encoder,
+        epochs=3,
+        label_processor=lambda x: class_label_maps[x[data_key]],
         name="freemusicarchive",
+        output_dim=len(class_label_maps),
+        test_split="fma_small_test",
         train_split="fma_small_train",
         valid_split="fma_small_valid",
-        test_split="fma_small_test",
         zenodo_id="14725056",
-        output_dim=len(class_label_maps),
-        label_processor=lambda x: class_label_maps[x[data_key]],
-        epochs=3,
-        crop_length=10,  # 10s
     )

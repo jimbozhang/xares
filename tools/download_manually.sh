@@ -24,12 +24,28 @@ if [ ! -f env/asvspoof2015/.audio_tar_ready ]; then
     touch env/asvspoof2015/.audio_tar_ready
 fi
 
+# clotho
+if [ ! -f env/clotho/.audio_tar_ready ]; then
+    mkdir -p env/clotho
+    wget https://zenodo.org/api/records/14856454/files-archive -O env/clotho/14856454.zip
+    unzip env/clotho/14856454.zip -d env/clotho/
+    touch env/clotho/.audio_tar_ready
+fi
+
 # cremad
 if [ ! -f env/cremad/.audio_tar_ready ]; then
     mkdir -p env/cremad
     wget https://zenodo.org/api/records/14646870/files-archive -O env/cremad/14646870.zip
     unzip env/cremad/14646870.zip -d env/cremad/
     touch env/cremad/.audio_tar_ready
+fi
+
+# desed
+if [ ! -f env/desed/.audio_tar_ready ]; then
+    mkdir -p env/desed
+    wget https://zenodo.org/api/records/14808180/files-archive -O env/desed/14808180.zip
+    unzip env/desed/14808180.zip -d env/desed/
+    touch env/desed/.audio_tar_ready
 fi
 
 # esc50
@@ -54,6 +70,14 @@ if [ ! -f env/freemusicarchive/.audio_tar_ready ]; then
     wget https://zenodo.org/api/records/14725056/files-archive -O env/freemusicarchive/14725056.zip
     unzip env/freemusicarchive/14725056.zip -d env/freemusicarchive/
     touch env/freemusicarchive/.audio_tar_ready
+fi
+
+# fsd50k
+if [ ! -f env/fsd50k/.audio_tar_ready ]; then
+    mkdir -p env/fsd50k
+    wget https://zenodo.org/api/records/14856614/files-archive -O env/fsk50k/14856614.zip
+    unzip env/fsd50k/14856614.zip -d env/fsd50k/
+    touch env/fsd50k/.audio_tar_ready
 fi
 
 # fsdkaggle2018
@@ -86,6 +110,14 @@ if [ ! -f env/librispeechmalefemale/.audio_tar_ready ]; then
     wget https://zenodo.org/api/records/14716252/files-archive -O env/librispeechmalefemale/14716252.zip
     unzip env/librispeechmalefemale/14716252.zip -d env/librispeechmalefemale/
     touch env/librispeechmalefemale/.audio_tar_ready
+fi
+
+# maestro
+if [ ! -f env/maestro/.audio_tar_ready ]; then
+    mkdir -p env/maestro
+    wget https://zenodo.org/api/records/14858022/files-archive -O env/maestro/14858022.zip
+    unzip env/maestro/14858022.zip -d env/maestro/
+    touch env/maestro/.audio_tar_ready
 fi
 
 # nsynthinstument
@@ -150,38 +182,6 @@ if [ ! -f env/voxlingua33/.audio_tar_ready ]; then
     wget https://zenodo.org/api/records/14812245/files-archive -O env/voxlingua33/14812245.zip
     unzip env/voxlingua33/14812245.zip -d env/voxlingua33/
     touch env/voxlingua33/.audio_tar_ready
-fi
-
-# desed
-if [ ! -f env/desed/.audio_tar_ready ]; then
-    mkdir -p env/desed
-    wget https://zenodo.org/api/records/14808180/files-archive -O env/desed/14808180.zip
-    unzip env/desed/14808180.zip -d env/desed/
-    touch env/desed/.audio_tar_ready
-fi
-
-# clotho
-if [ ! -f env/clotho/.audio_tar_ready ]; then
-    mkdir -p env/clotho
-    wget https://zenodo.org/api/records/14856454/files-archive -O env/clotho/14856454.zip
-    unzip env/clotho/14856454.zip -d env/clotho/
-    touch env/clotho/.audio_tar_ready
-fi
-
-# fsd50k
-if [ ! -f env/fsd50k/.audio_tar_ready ]; then
-    mkdir -p env/fsd50k
-    wget https://zenodo.org/api/records/14856614/files-archive -O env/fsk50k/14856614.zip
-    unzip env/fsd50k/14856614.zip -d env/fsd50k/
-    touch env/fsd50k/.audio_tar_ready
-fi
-
-# maestro
-if [ ! -f env/maestro/.audio_tar_ready ]; then
-    mkdir -p env/maestro
-    wget https://zenodo.org/api/records/14858022/files-archive -O env/maestro/14858022.zip
-    unzip env/maestro/14858022.zip -d env/maestro/
-    touch env/maestro/.audio_tar_ready
 fi
 
 # vocalimiations

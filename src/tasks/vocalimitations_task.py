@@ -309,12 +309,12 @@ def vocalimiations_config(encoder) -> TaskConfig:
     }
     config = TaskConfig(
         encoder=encoder,
-        name="vocalimitations",
-        zenodo_id="14862060",
-        k_fold_splits=list(range(0, 3)),
-        output_dim=len(class_label_maps),
-        label_processor=lambda x: class_label_maps[x[task]],
         epochs=20,
+        k_fold_splits=list(range(0, 3)),
+        label_processor=lambda x: class_label_maps[x[task]],
+        name="vocalimitations",
+        output_dim=len(class_label_maps),
+        zenodo_id="14862060",
     )
     config.audio_tar_name_of_split = {
         fold: f"vocal_imitations_fold{fold:02}_0000000.tar" for fold in config.k_fold_splits
