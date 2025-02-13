@@ -187,7 +187,7 @@ fi
 # vocalimiations
 if [ ! -f env/vocalimitations/.audio_tar_ready ]; then
     mkdir -p env/vocalimitations
-    wget https://zenodo.org/api/records/14858705/files-archive -O env/vocalimitations/14858705.zip
-    unzip env/vocalimitations/14858705.zip -d env/vocalimitations/
+    wget https://zenodo.org/api/records/14862060/files-archive -O env/vocalimitations/14862060.zip
+    unzip env/vocalimitations/14862060.zip -d env/vocalimitations/
     touch env/vocalimitations/.audio_tar_ready
 fi

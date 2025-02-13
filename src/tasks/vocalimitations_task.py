@@ -310,7 +310,7 @@ def vocalimiations_config(encoder) -> TaskConfig:
     config = TaskConfig(
         encoder=encoder,
         name="vocalimitations",
-        zenodo_id="14858705",
+        zenodo_id="14862060",
         k_fold_splits=list(range(0, 3)),
         output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x[task]],
