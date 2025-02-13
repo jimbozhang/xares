@@ -76,7 +76,7 @@ def prepare_asr_task_batch(batch: Tuple, device: torch.device | str = "cpu", tok
 
     (x, _), labels, _ = batch
 
-    text_with_eos_bos = [f"<|vision_end|>{label["trans"]}{tokenizer.eos_token}" for label in labels]
+    text_with_eos_bos = [f"<|vision_end|>{label['trans']}{tokenizer.eos_token}" for label in labels]
     tokens = [tokenizer(text) for text in text_with_eos_bos]
     data_collator_for_lm = DataCollatorForLanguageModeling(tokenizer, mlm=False)
     y = data_collator_for_lm(tokens)["input_ids"]
