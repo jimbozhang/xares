@@ -139,16 +139,16 @@ fi
 # voxceleb1
 if [ ! -f env/voxceleb1/.audio_tar_ready ]; then
     mkdir -p env/voxceleb1
-    wget https://zenodo.org/api/records/14725363/files-archive -O env/voxceleb1/14725363.zip
-    unzip env/voxceleb1/14725363.zip -d env/voxceleb1/
+    wget https://zenodo.org/api/records/14811963/files-archive -O env/voxceleb1/14811963.zip
+    unzip env/voxceleb1/14811963.zip -d env/voxceleb1/
     touch env/voxceleb1/.audio_tar_ready
 fi
 
 # voxlingua33
 if [ ! -f env/voxlingua33/.audio_tar_ready ]; then
     mkdir -p env/voxlingua33
-    wget https://zenodo.org/api/records/14723799/files-archive -O env/voxlingua33/14723799.zip
-    unzip env/voxlingua33/14723799.zip -d env/voxlingua33/
+    wget https://zenodo.org/api/records/14812245/files-archive -O env/voxlingua33/14812245.zip
+    unzip env/voxlingua33/14812245.zip -d env/voxlingua33/
     touch env/voxlingua33/.audio_tar_ready
 fi
 
@@ -187,7 +187,7 @@ fi
 # vocalimiations
 if [ ! -f env/vocalimitations/.audio_tar_ready ]; then
     mkdir -p env/vocalimitations
-    wget https://zenodo.org/api/records/14858705/files-archive -O env/vocalimitations/14858705.zip
-    unzip env/vocalimitations/14858705.zip -d env/vocalimitations/
+    wget https://zenodo.org/api/records/14862060/files-archive -O env/vocalimitations/14862060.zip
+    unzip env/vocalimitations/14862060.zip -d env/vocalimitations/
     touch env/vocalimitations/.audio_tar_ready
 fi
