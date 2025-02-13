@@ -224,7 +224,7 @@ def fsd50k_config(encoder) -> TaskConfig:
         valid_split="fsdk50_validation",
         criterion="BCEWithLogitsLoss",
         metric="mAP",
-        zenodo_id="TODO",
+        zenodo_id="14856614",
         batch_size_train=64,
         output_dim=len(class_label_maps),
         label_processor=manyhot_label_map,

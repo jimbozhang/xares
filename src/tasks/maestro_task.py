@@ -112,7 +112,7 @@ def maestro_config(encoder) -> TaskConfig:
     config = TaskConfig(
         encoder=encoder,
         name="maestro",
-        zenodo_id="TODO",
+        zenodo_id="14858022",
         train_split="maestro_train",
         valid_split="maestro_valid",
         test_split="maestro_test",
