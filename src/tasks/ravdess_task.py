@@ -14,12 +14,12 @@ def ravdess_config(encoder) -> TaskConfig:
     }
 
     config = TaskConfig(
-        name="ravdess",
         encoder=encoder,
-        zenodo_id="14722524",
         k_fold_splits=list(range(0, 4)),
-        output_dim=len(class_label_maps),
         label_processor=lambda x: class_label_maps[x["emotion"]],
+        name="ravdess",
+        output_dim=len(class_label_maps),
+        zenodo_id="14722524",
     )
 
     config.audio_tar_name_of_split = {fold: f"ravdess_fold_{fold}_0000000.tar" for fold in config.k_fold_splits}

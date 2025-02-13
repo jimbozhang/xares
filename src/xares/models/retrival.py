@@ -1,6 +1,4 @@
 import os
-from pathlib import Path
-from typing import List
 
 import torch
 import torch.nn as nn
@@ -8,41 +6,6 @@ import torch.nn.functional as F
 from loguru import logger
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-
-def download_model_to_local(model_names: str | List[str], output_root: str = "."):
-    # Download the model to the local directory to avoid issues under multi-processes
-    if isinstance(model_names, str):
-        model_names = [model_names]
-
-    if "bert-base-uncased:tokenizer" in model_names:
-        model_name = "google-bert/bert-base-uncased"
-        output_path = Path(output_root) / model_name
-        if not output_path.exists():
-            from transformers import AutoTokenizer
-
-            tokenizer = AutoTokenizer.from_pretrained(model_name)
-            tokenizer.save_pretrained(output_path)
-        model_names.remove("bert-base-uncased:tokenizer")
-
-    if len(model_names) > 0:
-        logger.warning(f"Models {model_names} are not supported for download")
-
-
-class Mlp(nn.Module):
-    def __init__(self, in_features, out_features: int | None = None, criterion="CrossEntropyLoss"):
-        super().__init__()
-        out_features = out_features or in_features
-        self.ln = nn.LayerNorm(in_features)
-        self.fc = nn.Linear(in_features, out_features)
-        self.criterion = getattr(nn, criterion)()
-
-    def forward(self, x: torch.Tensor, y: torch.Tensor | None = None, return_loss: bool = False):
-        x = self.ln(x)
-        x = self.fc(x)
-        if y is not None and return_loss:
-            return self.criterion(x, y)
-        return x, y
 
 
 class AudioTextContrastiveLoss(nn.Module):

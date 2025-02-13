@@ -37,14 +37,14 @@ def speechcommandsv1_config(encoder) -> TaskConfig:
     data_key = "labels"
 
     return TaskConfig(
-        encoder=encoder,
-        name="speechcommandsv1",
         batch_size_train=64,
+        encoder=encoder,
+        label_processor=lambda x: class_label_maps[x[data_key]],
         learning_rate=1e-3,
+        name="speechcommandsv1",
+        output_dim=len(class_label_maps),
+        test_split="wds-audio-test",
         train_split="wds-audio-train",
         valid_split="wds-audio-valid",
-        test_split="wds-audio-test",
         zenodo_id="14722647",
-        output_dim=len(class_label_maps),
-        label_processor=lambda x: class_label_maps[x[data_key]],
     )

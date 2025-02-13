@@ -35,14 +35,14 @@ def liveenv_config(encoder) -> TaskConfig:
     }
 
     return TaskConfig(
+        do_knn=False,
+        encoder=encoder,
+        epochs=50,
+        label_processor=lambda x: class_label_maps[x[data_key]],
         name="liveenv",
+        output_dim=len(class_label_maps),
         private=True,
+        test_split="liveenv_test",
         train_split="liveenv_train",
         valid_split="liveenv_test",
-        test_split="liveenv_test",
-        output_dim=len(class_label_maps),
-        label_processor=lambda x: class_label_maps[x[data_key]],
-        do_knn=False,
-        epochs=50,
-        encoder=encoder,
     )

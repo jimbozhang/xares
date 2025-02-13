@@ -11,21 +11,21 @@ def data_merge_function_clotho(data_stream):
 def clotho_config(encoder) -> TaskConfig:
     task_config = TaskConfig(
         batch_size_train=128,
-        encoder=encoder,
-        name="clotho",
         criterion="AudioTextContrastiveLoss",
-        train_split="clotho_development",
-        test_split="clotho_validation",  # Worst naming scheme in a dataset
-        valid_split="clotho_evaluation",
-        zenodo_id="14856454",
-        metric="recallatk_r1",
-        task_type="contrastive",
-        merge_processor=data_merge_function_clotho,
-        num_training_workers=4,
-        epochs=20,
         crop_length=30,
         do_knn=False,
-        save_encoded_per_batches=500,
+        encoder=encoder,
+        epochs=20,
+        merge_processor=data_merge_function_clotho,
+        metric="recallatk_r1",
+        name="clotho",
+        num_training_workers=4,
         pretrained_dependencies=["bert-base-uncased:tokenizer"],
+        save_encoded_per_batches=500,
+        task_type="contrastive",
+        test_split="clotho_validation",  # Worst naming scheme in a dataset
+        train_split="clotho_development",
+        valid_split="clotho_evaluation",
+        zenodo_id="14856454",
     )
     return task_config

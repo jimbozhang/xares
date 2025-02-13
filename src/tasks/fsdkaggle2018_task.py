@@ -47,16 +47,16 @@ def fsdkaggle2018_config(encoder) -> TaskConfig:
         "Finger_snapping": 40,
     }
     return TaskConfig(
-        name="fsdkaggle2018",
-        encoder=encoder,
         batch_size_train=64,
+        do_knn=False,
+        encoder=encoder,
+        epochs=3,
+        label_processor=lambda x: class_label_maps[x[data_key]],
         learning_rate=1e-3,
-        train_split="fsd18_train",
+        name="fsdkaggle2018",
+        output_dim=len(class_label_maps),
         test_split="fsd18_test",
+        train_split="fsd18_train",
         valid_split="fsd18_test",
         zenodo_id="14725117",
-        output_dim=len(class_label_maps),
-        label_processor=lambda x: class_label_maps[x[data_key]],
-        do_knn=False,
-        epochs=3,
     )
