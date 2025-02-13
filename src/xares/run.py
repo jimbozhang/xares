@@ -28,7 +28,7 @@ def worker(
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
     if config.disabled:
         logger.warning(f"Task {config.name} is disabled, skipping")
-        return
+        return (0, 0), (0, 0)
     task = XaresTask(config=config)
 
     # Run the task
