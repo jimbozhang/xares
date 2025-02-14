@@ -226,9 +226,9 @@ def fsd50k_config(encoder) -> TaskConfig:
         metric="mAP",
         name="fsd50k",
         output_dim=len(class_label_maps),
-        test_split="fsdk50_eval",
-        train_split="fsdk50_train",
-        valid_split="fsdk50_validation",
-        zenodo_id="14856614",
+        test_split="fsd50k_eval",
+        train_split="fsd50k_train",
+        valid_split="fsd50k_validation",
+        zenodo_id="14868441",
     )
     return task_config

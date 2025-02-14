@@ -75,8 +75,8 @@ fi
 # fsd50k
 if [ ! -f env/fsd50k/.audio_tar_ready ]; then
     mkdir -p env/fsd50k
-    wget https://zenodo.org/api/records/14856614/files-archive -O env/fsk50k/14856614.zip
-    unzip env/fsd50k/14856614.zip -d env/fsd50k/
+    wget https://zenodo.org/api/records/14868441/files-archive -O env/fsk50k/14868441.zip
+    unzip env/fsd50k/14868441.zip -d env/fsd50k/
     touch env/fsd50k/.audio_tar_ready
 fi
 
