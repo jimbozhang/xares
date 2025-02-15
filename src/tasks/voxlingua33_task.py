@@ -41,18 +41,18 @@ def voxlingua33_config(encoder) -> TaskConfig:
     }
 
     config = TaskConfig(
-        name="voxlingua33",
-        encoder=encoder,
         batch_size_train=64,
+        crop_length=10,
+        encoder=encoder,
+        epochs=10,
+        label_processor=lambda x: class_label_maps[x["labels"]],
         learning_rate=1e-3,
-        train_split="train_subset",
+        name="voxlingua33",
+        output_dim=len(class_label_maps),
         test_split="dev",
+        train_split="train_subset",
         valid_split="dev",
         zenodo_id="14812245",
-        output_dim=len(class_label_maps),
-        epochs=10,
-        crop_length=10,
-        label_processor=lambda x: class_label_maps[x["labels"]],
     )
 
     if config.use_mini_dataset:

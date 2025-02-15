@@ -217,18 +217,18 @@ def fsd50k_config(encoder) -> TaskConfig:
         return target_vec.tolist()
 
     task_config = TaskConfig(
-        name="fsd50k",
-        encoder=encoder,
-        train_split="fsdk50_train",
-        test_split="fsdk50_eval",
-        valid_split="fsdk50_validation",
-        criterion="BCEWithLogitsLoss",
-        metric="mAP",
-        zenodo_id="14856614",
         batch_size_train=64,
-        output_dim=len(class_label_maps),
-        label_processor=manyhot_label_map,
+        criterion="BCEWithLogitsLoss",
         crop_length=10,  # 10s, even though samples are 30s
         do_knn=False,
+        encoder=encoder,
+        label_processor=manyhot_label_map,
+        metric="mAP",
+        name="fsd50k",
+        output_dim=len(class_label_maps),
+        test_split="fsd50k_eval",
+        train_split="fsd50k_train",
+        valid_split="fsd50k_validation",
+        zenodo_id="14868441",
     )
     return task_config

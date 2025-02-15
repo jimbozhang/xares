@@ -255,12 +255,12 @@ def fluentspeechcommands_config(encoder) -> TaskConfig:
     }
 
     return TaskConfig(
-        name="fluentspeechcommands",
         encoder=encoder,
+        label_processor=lambda x: class_label_maps[x[data_key]],
+        name="fluentspeechcommands",
+        output_dim=len(class_label_maps),
+        test_split="fluentspeechcommands_test",
         train_split="fluentspeechcommands_train",
         valid_split="fluentspeechcommands_valid",
-        test_split="fluentspeechcommands_test",
         zenodo_id="14722453",
-        output_dim=len(class_label_maps),
-        label_processor=lambda x: class_label_maps[x[data_key]],
     )
