@@ -100,6 +100,7 @@ class Decoder(nn.Module):
         return output
 
 
+# Copied from https://github.com/Lightning-AI/litgpt/blob/f6031e3a88e272ec86ad8f412573699589f4d41b/litgpt/generate/base.py#L30
 def multinomial_num_samples_1(probs: torch.Tensor) -> torch.Tensor:
     if torch._dynamo.is_compiling():
         # Faster alternative to `torch.multinomial(probs, num_samples=1)` that is also CUDAGraph friendly
@@ -124,10 +125,7 @@ def sample_top_p(logits: torch.Tensor, top_p: float) -> torch.Tensor:
 
 
 def sample(
-    logits: torch.Tensor,
-    temperature: float = 1.0,
-    top_k: Optional[int] = None,
-    top_p: float = 1.0,
+    logits: torch.Tensor, temperature: float = 1.0, top_k: Optional[int] = None, top_p: float = 1.0
 ) -> torch.Tensor:
     if top_p < 0.0 or top_p > 1.0:
         raise ValueError(f"top_p must be in [0, 1], got {top_p}")
@@ -149,6 +147,9 @@ def sample(
     return torch.argmax(logits, dim=-1, keepdim=True)
 
 
+## End of copied code
+
+
 class AsrModelForGeneration(nn.Module):
     def __init__(self, in_features, **_):
         super().__init__()
@@ -156,7 +157,7 @@ class AsrModelForGeneration(nn.Module):
         self.decoder = Decoder(audio_features_dim=in_features)
         self.decoder.freeze_lm()
         self.tokenizer = self.decoder.tokenizer
-        self.seprate_token = "<|vision_end|>"
+        self.sep_token = "<|vision_end|>"
 
         self.criterion = lambda x, y: torch.tensor(wer(x, y))
 
@@ -182,7 +183,7 @@ class AsrModelForGeneration(nn.Module):
             assert batch_a.shape[0] == batch_t.shape[0]
             for i in range(batch_t.shape[0]):
                 label_text = self.tokenizer.decode(batch_t[i])
-                label_text = label_text.replace(self.seprate_token, "").strip(self.tokenizer.pad_token)
+                label_text = label_text.replace(self.sep_token, "").strip(self.tokenizer.pad_token)
                 label_texts.append(label_text)
 
             return generated_texts, label_texts
@@ -197,7 +198,7 @@ class AsrModelForGeneration(nn.Module):
         top_k: Optional[int] = None,
         top_p: float = 1.0,
     ) -> torch.Tensor:
-        input_ids = self.decoder.tokenizer(self.seprate_token, return_tensors="pt")
+        input_ids = self.decoder.tokenizer(self.sep_token, return_tensors="pt")
         self.decoder.clear_kvcache()
         logits = self.decoder(
             encoded_audio=audio_features,

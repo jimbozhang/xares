@@ -68,7 +68,9 @@ def prepare_frame_task_batch(batch: Tuple, device: torch.device | str = "cpu"):
     return x.transpose(-2, -1).contiguous().to(device), y.transpose(-2, -1).contiguous().to(device)
 
 
-def prepare_asr_task_batch(batch: Tuple, device: torch.device | str = "cpu", tokenizer: Any = None):
+def prepare_asr_task_batch(
+    batch: Tuple, device: torch.device | str = "cpu", tokenizer: Any = None, sep_token: str = "<|vision_end|>"
+):
     if tokenizer is None:
         raise ValueError("Tokenizer must be provided for ASR task.")
 
@@ -76,7 +78,7 @@ def prepare_asr_task_batch(batch: Tuple, device: torch.device | str = "cpu", tok
 
     (x, _), labels, _ = batch
 
-    text_with_eos_bos = [f"<|vision_end|>{label['trans']}{tokenizer.eos_token}" for label in labels]
+    text_with_eos_bos = [f"{sep_token}{label['trans']}{tokenizer.eos_token}" for label in labels]
     tokens = [tokenizer(text) for text in text_with_eos_bos]
     data_collator_for_lm = DataCollatorForLanguageModeling(tokenizer, mlm=False)
     y = data_collator_for_lm(tokens)["input_ids"]
