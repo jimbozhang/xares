@@ -1,9 +1,9 @@
 import os
 from typing import List, Optional, Tuple
 
-import numpy as np
 import torch
 import torch.nn as nn
+from jiwer import wer
 from torch import Tensor
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -156,35 +156,52 @@ class AsrModelForGeneration(nn.Module):
         self.decoder = Decoder(audio_features_dim=in_features)
         self.decoder.freeze_lm()
         self.tokenizer = self.decoder.tokenizer
+        self.seprate_token = "<|vision_end|>"
 
-        self.criterion = self.decoder.transformer.loss_function  # tranformers.loss.ForCausalLMLoss
+        self.criterion = lambda x, y: torch.tensor(wer(x, y))
 
     def forward(self, batch_a: torch.Tensor, batch_t: torch.Tensor = None, return_loss: bool = True) -> torch.Tensor:
-        return self.decoder(
+        result = self.decoder(
             encoded_audio=batch_a,
             attention_mask_a=None,
             input_ids=batch_t,
             attention_mask_t=None,
             labels=batch_t if return_loss else None,
         )
+        if return_loss:
+            return result.loss
+        else:
+            # Generate text for each audio input in the batch
+            generated_texts = []
+            for i in range(batch_a.shape[0]):
+                single_audio = batch_a[i : i + 1]  # Keep batch dimension
+                output_text = self.tokenizer.decode(self.generate(single_audio))
+                generated_texts.append(output_text)
+
+            label_texts = []
+            assert batch_a.shape[0] == batch_t.shape[0]
+            for i in range(batch_t.shape[0]):
+                label_text = self.tokenizer.decode(batch_t[i])
+                label_text = label_text.replace(self.seprate_token, "").strip(self.tokenizer.pad_token)
+                label_texts.append(label_text)
+
+            return generated_texts, label_texts
 
     @torch.inference_mode()
     def generate(
         self,
-        audio_features: np.ndarray,
-        sampling_rate: int = 16000,
+        audio_features: torch.Tensor,
         max_returned_tokens: int = 200,
         *,
         temperature: float = 1.0,
         top_k: Optional[int] = None,
         top_p: float = 1.0,
     ) -> torch.Tensor:
-        encoder_outputs = self.encoder(audio_features, sampling_rate)
-        input_ids = self.decoder.tokenizer(["<|vision_end|>"], return_tensors="pt")
+        input_ids = self.decoder.tokenizer(self.seprate_token, return_tensors="pt")
         self.decoder.clear_kvcache()
         logits = self.decoder(
-            encoded_audio=encoder_outputs["input_features"],
-            attention_mask_a=encoder_outputs["attention_mask"],
+            encoded_audio=audio_features,
+            attention_mask_a=None,
             input_ids=input_ids["input_ids"],
             enable_kvcache=True,
         ).logits

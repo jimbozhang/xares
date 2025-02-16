@@ -147,7 +147,7 @@ class Trainer:
         self.model.train()
         with torch.enable_grad():
             self.optimizer.zero_grad()
-            loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True).loss
+            loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
             loss.backward()
 
             if (engine.state.iteration - 1) % self.gradient_accumulation_steps == 0:

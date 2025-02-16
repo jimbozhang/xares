@@ -336,6 +336,8 @@ class XaresTask:
         except RuntimeError as e:
             if "at least one example" in str(e):
                 raise RuntimeError(f"Empty dataloader. Try delete {self.encoded_ready_path} and re-run.")
+            else:
+                raise e
 
     def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Tuple[Dict[METRICS_TYPE, Any], int]:
         if self.trainer is None:

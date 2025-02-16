@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from ignite.metrics import Accuracy, AveragePrecision, EpochMetric, MeanAbsoluteError, MeanSquaredError, Metric
 
-METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk_r1", "MAE", "MSE", "segmentf1"]
+METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk_r1", "MAE", "MSE", "segmentf1", "WER"]
 
 
 @dataclass
@@ -19,8 +19,7 @@ class EvalMetric:
     score: float = 1.0  # can also be -1
 
 
-class CLAPScore(Metric):
-
+class ClapScore(Metric):
     def __init__(
         self,
         num_caps: int = 5,  # Clotho uses 5 caps
@@ -61,7 +60,6 @@ class CLAPScore(Metric):
 
 
 class SegmentF1Metric(Metric):
-
     def __init__(self, *args, output_transform=lambda x: x, hop_size_in_ms: float, segment_length_in_s: float = 1.0):
         super().__init__(*args, output_transform=output_transform)
         self._reset()
@@ -111,6 +109,34 @@ def compute_eer(pred, target, positive_label: int = 1):
 
 EERMetric = lambda: EpochMetric(compute_fn=compute_eer)
 
+
+class WerScore(Metric):
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self._reset()
+
+    def _reset(self):
+        self.pred, self.target = [], []
+
+    def update(self, output):
+        pred, target = output
+        self.pred.append(pred)
+        self.target.append(target)
+
+    def reset(self):
+        self._reset()
+
+    def compute(self) -> Dict[str, float] | float:
+        from jiwer import wer
+
+        wer_score = max(0, 1 - wer(self.target, self.pred))
+        return wer_score
+
+
 ALL_METRICS: Dict[METRICS_TYPE, EvalMetric] = dict(
     accuracy=EvalMetric(Accuracy, score=1.0),
     frame_mAP=EvalMetric(
@@ -123,8 +149,9 @@ ALL_METRICS: Dict[METRICS_TYPE, EvalMetric] = dict(
     mAP=EvalMetric(AveragePrecision, score=1.0),
     MAE=EvalMetric(MeanAbsoluteError, score=-1.0),
     MSE=EvalMetric(MeanSquaredError, score=-1.0),
-    recallatk_r1=EvalMetric(partial(CLAPScore, select="r1"), score=1.0),
+    recallatk_r1=EvalMetric(partial(ClapScore, select="r1"), score=1.0),
     EER=EvalMetric(EERMetric, score=-1.0),
+    WER=EvalMetric(WerScore, score=1.0),
 )
 
 
