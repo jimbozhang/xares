@@ -125,5 +125,6 @@ def maestro_config(encoder) -> TaskConfig:
         train_split="maestro_train",
         valid_split="maestro_valid",
         zenodo_id="14858022",
+        do_knn=False
     )
     return config
