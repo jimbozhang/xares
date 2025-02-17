@@ -36,17 +36,16 @@ def desed_config(encoder) -> TaskConfig:
         return target
 
     return TaskConfig(
+        criterion="BCEWithLogitsLoss",
+        do_knn=False,
         encoder=encoder,
+        label_processor=label_transform,
+        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms if encoder else 0, segment_length_in_s=1.0),
+        metric="segmentf1",
         name="desed",
-        train_split="wds-audio-train",
+        output_dim=len(class_label_maps),
+        task_type="frame",
         test_split="wds-audio-eval",
         valid_split="wds-audio-eval",
         zenodo_id="14808180",
-        output_dim=len(class_label_maps),
-        label_processor=label_transform,
-        criterion="BCEWithLogitsLoss",
-        metric="segmentf1",
-        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms, segment_length_in_s=1.0),
-        task_type="frame",
-        do_knn=False,
     )

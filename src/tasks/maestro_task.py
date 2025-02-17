@@ -110,20 +110,20 @@ def maestro_config(encoder) -> TaskConfig:
         return target_vector
 
     config = TaskConfig(
-        encoder=encoder,
-        name="maestro",
-        zenodo_id="TODO",
-        train_split="maestro_train",
-        valid_split="maestro_valid",
-        test_split="maestro_test",
-        task_type="frame",
-        output_dim=len(class_label_maps),
-        criterion="BCEWithLogitsLoss",
-        metric="segmentf1",
-        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms, segment_length_in_s=0.1),
-        epochs=50,
         batch_size_encode=1,  # Long samples
         batch_size_train=1,  # Samples are very long, avoid extreme padding
+        criterion="BCEWithLogitsLoss",
+        encoder=encoder,
+        epochs=50,
         label_processor=label_processor,
+        metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms if encoder else 0, segment_length_in_s=0.1),
+        metric="segmentf1",
+        name="maestro",
+        output_dim=len(class_label_maps),
+        task_type="frame",
+        test_split="maestro_test",
+        train_split="maestro_train",
+        valid_split="maestro_valid",
+        zenodo_id="14858022",
     )
     return config

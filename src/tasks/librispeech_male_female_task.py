@@ -5,14 +5,14 @@ from xares.task import TaskConfig
 
 def librispeech_male_female_config(encoder) -> TaskConfig:
     config = TaskConfig(
-        name="librispeechmalefemale",
         encoder=encoder,
-        zenodo_id="14716252",
+        label_processor=lambda x: 0 if x["gender"] == "M" else 1,
+        name="librispeechmalefemale",
         output_dim=2,
+        test_split="test-clean",
         train_split="train-clean-100",
         valid_split="dev-clean",
-        test_split="test-clean",
-        label_processor=lambda x: 0 if x["gender"] == "M" else 1,
+        zenodo_id="14716252",
     )
 
     if config.use_mini_dataset:
