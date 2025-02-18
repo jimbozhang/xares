@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from ignite.metrics import Accuracy, AveragePrecision, EpochMetric, MeanAbsoluteError, MeanSquaredError, Metric
 
-METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk_r1", "MAE", "MSE", "segmentf1", "WER"]
+METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk_r1", "MAE", "MSE", "segmentf1", "WER_inv"]
 
 
 @dataclass
@@ -151,7 +151,7 @@ ALL_METRICS: Dict[METRICS_TYPE, EvalMetric] = dict(
     MSE=EvalMetric(MeanSquaredError, score=-1.0),
     recallatk_r1=EvalMetric(partial(ClapScore, select="r1"), score=1.0),
     EER=EvalMetric(EERMetric, score=-1.0),
-    WER=EvalMetric(WerScore, score=1.0),
+    WER_inv=EvalMetric(WerScore, score=1.0),
 )
 
 

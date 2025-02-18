@@ -11,7 +11,7 @@ def librispeech_asr_config(encoder) -> TaskConfig:
         do_knn=False,
         gradient_accumulation_steps=32,
         label_processor=None,
-        metric="WER",
+        metric="WER_inv",
         name="librispeech",
         pretrained_dependencies=["qwen2"],
         task_type="asr",
