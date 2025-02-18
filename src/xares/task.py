@@ -343,6 +343,8 @@ class XaresTask:
             batch_size=self.config.batch_size_train,
             num_workers=self.config.num_validation_workers,
             label_processor=self.label_processor,
+            merge_processor=self.merge_processor,
+            training=False
         )
         return self.trainer.run_inference(dl)  # (result, size)
 
