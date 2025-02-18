@@ -159,6 +159,11 @@ class AsrModelForGeneration(nn.Module):
         self.tokenizer = self.decoder.tokenizer
         self.sep_token = "<|vision_end|>"
 
+        def wer_as_loss(x, y):
+            if len(x) == 0 or len(y) == 0:
+                return torch.tensor(1.0)
+            return torch.tensor(wer(x, y))
+
         self.criterion = lambda x, y: torch.tensor(wer(x, y))
 
     def forward(self, batch_a: torch.Tensor, batch_t: torch.Tensor = None, return_loss: bool = True) -> torch.Tensor:
