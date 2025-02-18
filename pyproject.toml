@@ -4,22 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xares"
-version = "0.0.6"
+version = "0.1.0"
 description = "eXtensive Audio Representation and Evaluation Suite"
 dependencies = [
   "loguru",
   "numpy<2",
+  "jiwer",
   "scikit-learn==1.6.0",
   "torch==2.2.1",
   "torchaudio==2.2.1",
-  "torchmetrics",
-  "pandas",
+  "torchmetrics==1.6.1",
+  "pandas==2.2.3",
   "pytorch-ignite==0.5.1",
   "pyyaml",
-  "soundfile",
+  "soundfile==0.13.1",  
+  "transformers==4.47.1",
   "tqdm",
   "webdataset==0.2.100",
-  "pysoundfile",
 ]
 authors = [
   {name = "Junbo Zhang", email = "zhangjunbo1@xiaomi.com"},
@@ -37,7 +38,6 @@ Repository = "https://github.com/jimbozhang/xares.git"
 [project.optional-dependencies]
 examples = [
   "dasheng",
-  "transformers==4.47.1",
 ]
 
 [tool.setuptools.packages.find]

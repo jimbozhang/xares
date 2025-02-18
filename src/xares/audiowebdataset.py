@@ -172,6 +172,8 @@ def expand_with_brace(lists: Iterable[str] | str):
             r.extend([str(f) for f in Path(l).parent.glob(Path(l).name)])
         else:
             r.extend(braceexpand.braceexpand(l))
+        if any(not Path(l).exists() for l in r):
+            raise FileNotFoundError(f"One of the paths does not exist: {r}")
     return r
 
 

@@ -19,14 +19,14 @@ def nysnthinstument_config(encoder) -> TaskConfig:
         "synth_lead": 10,
     }
     config = TaskConfig(
-        name="nsynthinstument",
         encoder=encoder,
-        train_split="nsynth_train",
+        label_processor=lambda x: class_label_maps[x[data_key]],
+        name="nsynthinstument",
+        output_dim=len(class_label_maps),
         test_split="nsynth_test",
+        train_split="nsynth_train",
         valid_split="nsynth_valid",
         zenodo_id="14725174",
-        output_dim=len(class_label_maps),
-        label_processor=lambda x: class_label_maps[x[data_key]],
     )
 
     if config.use_mini_dataset:

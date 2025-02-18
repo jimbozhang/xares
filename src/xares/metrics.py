@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import partial
 from typing import Callable, Dict, List, Literal, Tuple
 
 import numpy as np
 import torch
 from ignite.metrics import Accuracy, AveragePrecision, EpochMetric, MeanAbsoluteError, MeanSquaredError, Metric
 
-METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk", "MAE", "MSE"]
+METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk_r1", "MAE", "MSE", "segmentf1", "WER_inv"]
 
 
 @dataclass
@@ -17,8 +19,7 @@ class EvalMetric:
     score: float = 1.0  # can also be -1
 
 
-class CLAPScore(Metric):
-
+class ClapScore(Metric):
     def __init__(
         self,
         num_caps: int = 5,  # Clotho uses 5 caps
@@ -58,6 +59,43 @@ class CLAPScore(Metric):
         )
 
 
+class SegmentF1Metric(Metric):
+    def __init__(self, *args, output_transform=lambda x: x, hop_size_in_ms: float, segment_length_in_s: float = 1.0):
+        super().__init__(*args, output_transform=output_transform)
+        self._reset()
+        self.max_pooling_size = math.ceil(segment_length_in_s / (hop_size_in_ms / 1000.0))
+
+    def _reset(self):
+        self.pred, self.targets = [], []
+
+    def update(self, output):
+        pred, tar = output
+        assert pred.ndim == tar.ndim, "Dims need to be identical"
+        pred = (
+            torch.nn.functional.max_pool1d(pred.transpose(-2, -1), kernel_size=self.max_pooling_size)
+            .transpose(-2, -1)
+            .flatten(0, 1)
+        )
+        tar = (
+            torch.nn.functional.max_pool1d(tar.transpose(-2, -1), kernel_size=self.max_pooling_size)
+            .transpose(-2, -1)
+            .flatten(0, 1)
+        )
+        self.pred.append(pred)
+        self.targets.append(tar)
+
+    def reset(self):
+        self._reset()
+
+    def compute(self) -> Dict[str, float] | float:
+        from sklearn.metrics import f1_score
+
+        # Binary classification, preds need to be {0,1} and targets
+        pred = torch.cat(self.pred).long().cpu().numpy()
+        tar = torch.cat(self.targets).long().cpu().numpy()
+        return f1_score(tar, pred, average="macro")
+
+
 def compute_eer(pred, target, positive_label: int = 1):
     from sklearn.metrics import roc_curve
 
@@ -71,13 +109,49 @@ def compute_eer(pred, target, positive_label: int = 1):
 
 EERMetric = lambda: EpochMetric(compute_fn=compute_eer)
 
+
+class WerScore(Metric):
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self._reset()
+
+    def _reset(self):
+        self.pred, self.target = [], []
+
+    def update(self, output):
+        pred, target = output
+        self.pred.extend(pred)
+        self.target.extend(target)
+
+    def reset(self):
+        self._reset()
+
+    def compute(self) -> Dict[str, float] | float:
+        from jiwer import wer
+
+        wer_score = max(0, 1 - wer(self.target, self.pred))
+        return wer_score
+
+
 ALL_METRICS: Dict[METRICS_TYPE, EvalMetric] = dict(
     accuracy=EvalMetric(Accuracy, score=1.0),
+    frame_mAP=EvalMetric(
+        partial(AveragePrecision, output_transform=lambda x: (torch.flatten(x[0], 0, 1), torch.flatten(x[1], 0, 1))),
+        score=1.0,
+    ),
+    segmentf1=EvalMetric(
+        partial(SegmentF1Metric, output_transform=lambda x: (x[0].sigmoid().round(), x[1])), score=1.0
+    ),
     mAP=EvalMetric(AveragePrecision, score=1.0),
     MAE=EvalMetric(MeanAbsoluteError, score=-1.0),
     MSE=EvalMetric(MeanSquaredError, score=-1.0),
-    recallatk=EvalMetric(CLAPScore, score=1.0),
+    recallatk_r1=EvalMetric(partial(ClapScore, select="r1"), score=1.0),
     EER=EvalMetric(EERMetric, score=-1.0),
+    WER_inv=EvalMetric(WerScore, score=1.0),
 )
 
 
@@ -161,7 +235,7 @@ def _clapscore(
         ret = result
     if select:
         ret = ret[select]
-    return ret
+    return ret / 100
 
 
 def weighted_average(scores_dict: Dict[str, List[Tuple[float, int]]]) -> List[float]:

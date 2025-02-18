@@ -26,6 +26,9 @@ def worker(
 
     # Task setup
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
+    if config.disabled:
+        logger.warning(f"Task {config.name} is disabled, skipping")
+        return (0, 0), (0, 0)
     task = XaresTask(config=config)
 
     # Run the task
@@ -94,6 +97,11 @@ def main(args):
             else:
                 logger.error(f"Error in stage 0 (download): {e} Must fix it before proceeding.")
                 return
+    else:
+        # Ensure pretrained model has been saved at local if stage 0 is skipped
+        for task_py in args.tasks_py:
+            worker(None, task_py)
+
     if args.to_stage == 0:
         return
 
@@ -116,46 +124,50 @@ def main(args):
 
     # Stage 1: Execute make_encoded_tar
     if args.from_stage <= 1:
-        if enable_multiprocessing:
-            try:
+        try:
+            if enable_multiprocessing:
                 num_gpus = torch.cuda.device_count()
                 with mp.Pool(processes=args.max_jobs) as pool:
                     pool.starmap(
                         stage_1,
                         [(args.encoder_py, task_py, i % num_gpus) for i, task_py in enumerate(args.tasks_py)],
                     )
-                logger.info("Stage 1 completed: All tasks encoded.")
-            except RuntimeError as e:
-                if "CUDA out of memory" in str(e):
-                    logger.error("CUDA out of memory. Try reducing `config.batch_size_encode` of tasks.")
-                else:
-                    logger.error(f"Error in stage 1 (encode): {e} Must fix it before proceeding.")
+            else:
+                for task_py in args.tasks_py:
+                    worker(args.encoder_py, task_py, do_encode=True)
+
+            logger.info("Stage 1 completed: All tasks encoded.")
+        except FileNotFoundError as e:
+            logger.error(f"Task filename pattern error: {e}")
+            return
+        except RuntimeError as e:
+            if "CUDA out of memory" in str(e):
+                logger.error("CUDA out of memory. Try reducing `config.batch_size_encode` of tasks.")
+            else:
+                logger.error(f"Error in stage 1 (encode): {e} Must fix it before proceeding.")
                 return
-        else:
-            for task_py in args.tasks_py:
-                worker(args.encoder_py, task_py, do_encode=True)
         logger.info("Stage 1 completed: All tasks encoded.")
     if args.to_stage == 1:
         return
 
     # Stage 2: Execute mlp and knn scoring
     if args.from_stage <= 2 and args.to_stage >= 2:
-        if enable_multiprocessing:
-            manager = mp.Manager()
-            return_dict = manager.dict()
-            try:
+        try:
+            if enable_multiprocessing:
+                manager = mp.Manager()
+                return_dict = manager.dict()
                 with mp.Pool(processes=args.max_jobs) as pool:
                     pool.starmap(
                         partial(stage_2, result=return_dict),
                         [(args.encoder_py, task_py) for task_py in args.tasks_py],
                     )
-            except RuntimeError as e:
-                logger.error(f"Error in stage 2 (scoring): {e} Must fix it before proceeding.")
-                return
-        else:
-            return_dict = {}
-            for task_py in args.tasks_py:
-                return_dict[task_py] = worker(args.encoder_py, task_py, do_mlp=True, do_knn=True)
+            else:
+                return_dict = {}
+                for task_py in args.tasks_py:
+                    return_dict[task_py] = worker(args.encoder_py, task_py, do_mlp=True, do_knn=True)
+        except RuntimeError as e:
+            logger.error(f"Error in stage 2 (scoring): {e} Must fix it before proceeding.")
+            return
         logger.info("Scoring completed: All tasks scored.")
 
         # Print results

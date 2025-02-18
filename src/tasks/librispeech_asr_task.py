@@ -3,15 +3,21 @@ from loguru import logger
 from xares.task import TaskConfig
 
 
-def librispeech_male_female_config(encoder) -> TaskConfig:
+def librispeech_asr_config(encoder) -> TaskConfig:
     config = TaskConfig(
-        crop_length=5,
         encoder=encoder,
-        label_processor=lambda x: 0 if x["gender"] == "M" else 1,
-        name="librispeechmalefemale",
-        output_dim=2,
+        batch_size_train=1,
+        disabled=True,
+        do_knn=False,
+        gradient_accumulation_steps=32,
+        label_processor=None,
+        metric="WER_inv",
+        name="librispeech",
+        pretrained_dependencies=["qwen2"],
+        task_type="asr",
         test_split="test-clean",
         train_split="train-clean-100",
+        use_mini_dataset=False,
         valid_split="dev-clean",
         zenodo_id="14716252",
     )

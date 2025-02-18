@@ -172,6 +172,8 @@ debug*
 # Pretrained
 facebook
 openai
+google-bert
+Qwen
 pretrained/
 
 # Output

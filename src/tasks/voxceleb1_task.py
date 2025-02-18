@@ -1258,15 +1258,16 @@ def voxceleb1_config(encoder) -> TaskConfig:
         "id11251": 1250,
     }
     config = TaskConfig(
-        name="voxceleb1",
-        train_split="voxceleb1_train",
-        test_split="voxceleb1_test",
-        valid_split="voxceleb1_valid",
-        zenodo_id="14725363",
-        epochs=5,
-        output_dim=len(class_label_maps),
-        label_processor=lambda x: class_label_maps[x["speakerid"]],
         encoder=encoder,
+        epochs=10,
+        crop_length=6,
+        label_processor=lambda x: class_label_maps[x["speakerid"]],
+        name="voxceleb1",
+        output_dim=len(class_label_maps),
+        test_split="voxceleb1_test",
+        train_split="voxceleb1_train",
+        valid_split="voxceleb1_valid",
+        zenodo_id="14811963",
     )
 
     if config.use_mini_dataset:

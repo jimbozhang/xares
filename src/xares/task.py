@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Tuple
@@ -18,22 +17,27 @@ from tqdm import tqdm
 from xares.audiowebdataset import create_embedding_webdataset, create_rawaudio_webdataset
 from xares.common import XaresSettings
 from xares.metrics import METRICS_TYPE
-from xares.models import Mlp
+from xares.models.asr import AsrModelForGeneration
+from xares.models.retrival import RetrivalMLP
+from xares.models.simple import Mlp
 from xares.trainer import KNNTrainer, Trainer
-from xares.utils import download_zenodo_record, mkdir_if_not_exists
+from xares.utils import download_hf_model_to_local, download_zenodo_record, mkdir_if_not_exists
 
 
 @dataclass
 class TaskConfig:
+    name: str
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
     env_root: Path | str | None = None
-    name: str = "default_task"
+    disabled: bool = False  # Skip the task, useful for debugging
 
     # General
     private: bool = False
     torch_num_threads: int = 2  # Do not use too many otherwise slows down
     seed: int = 42  # manual seed for all experiments
-    label_processor: Callable = field(default=lambda x: x)
+    label_processor: Callable | None = None
+    merge_processor: Callable | None = None
+    task_type: Literal["frame", "clip", "contrastive"] = "clip"
 
     # Splits
     train_split: None | str = "train"
@@ -51,6 +55,7 @@ class TaskConfig:
     # Encoded tar
     force_encode: bool = False
     encoder: None | Any = None
+    pretrained_dependencies: None | List[str] = None
     encoded_tar_name_of_split: Dict[Any, Any] = field(default_factory=lambda: dict())
     trim_length = None
     save_encoded_per_batches: int = 2000
@@ -63,15 +68,19 @@ class TaskConfig:
     ckpt_dir_name = "checkpoints"
     embedding_dir_name = "embeddings"
     ckpt_name = "best.ckpt"
-    criterion: Literal["CrossEntropyLoss", "BCEWithLogitsLoss", "L1Loss", "MSELoss"] = "CrossEntropyLoss"
+    criterion: Literal["CrossEntropyLoss", "BCEWithLogitsLoss", "L1Loss", "MSELoss", "AudioTextContrastiveLoss"] = (
+        "CrossEntropyLoss"
+    )
     batch_size_train: int = 32
+    gradient_accumulation_steps: int = 1
     learning_rate: float = 1e-3
     epochs: int = 10
     num_training_workers: int = 0
     num_validation_workers: int = 0
     model: nn.Module | None = None
     output_dim: int | None = None
-    metric: Literal["accuracy", "EER", "mAP", "recall@k", "MAE", "MSE"] = "accuracy"
+    metric: METRICS_TYPE = "accuracy"
+    metric_args: Dict[str, Any] = field(default_factory=lambda: dict())
 
     # KNN
     do_knn: bool = True
@@ -131,11 +140,22 @@ class XaresTask:
             self.config.train_split = self.config.valid_split = self.config.test_split = None
 
         self.label_processor = self.config.label_processor
+        self.merge_processor = self.config.merge_processor
+
+        if self.config.task_type == "contrastive":
+            self.mlp_model = RetrivalMLP
+        elif self.config.task_type == "asr":
+            self.mlp_model = AsrModelForGeneration
+        else:
+            self.mlp_model = Mlp
 
         self.encoded_tar_path_of_split = {
             split: (self.encoded_tar_dir / self.config.encoded_tar_name_of_split[split])
             for split in self.config.encoded_tar_name_of_split
         }
+
+        if self.config.pretrained_dependencies is not None:
+            download_hf_model_to_local(self.config.pretrained_dependencies)
 
     def download_audio_tar(self):
         if self.config.private:
@@ -259,12 +279,11 @@ class XaresTask:
                 [self.encoded_tar_path_of_split[self.config.train_split].as_posix()],
                 [self.encoded_tar_path_of_split[self.config.valid_split].as_posix()],
             )
-            score = self.evaluate_mlp(
+            mlp_score, eval_size = self.evaluate_mlp(
                 [self.encoded_tar_path_of_split[self.config.test_split].as_posix()],
                 load_ckpt=True,
             )
-            logger.info(f"The {self.config.metric}: {score}")
-            mlp_score, eval_size = score
+            logger.info(f"The {self.config.metric}: {mlp_score}")
 
         with open(score_file, "w") as f:
             f.write(f"{mlp_score}\n{eval_size}")
@@ -273,7 +292,7 @@ class XaresTask:
         return mlp_score, eval_size
 
     def train_mlp(self, train_url: list, validation_url: list) -> None:
-        mlp = Mlp(
+        mlp = self.mlp_model(
             in_features=self.encoder.output_dim, out_features=self.config.output_dim, criterion=self.config.criterion
         )
 
@@ -282,8 +301,11 @@ class XaresTask:
             ckpt_dir=self.ckpt_dir,
             ckpt_name=self.config.ckpt_name,
             metric=self.config.metric,
+            metric_args=self.config.metric_args,
+            gradient_accumulation_steps=self.config.gradient_accumulation_steps,
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
+            task_type=self.config.task_type,
         )
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
@@ -298,6 +320,7 @@ class XaresTask:
             num_workers=self.config.num_training_workers,
             training=True,
             label_processor=self.label_processor,
+            merge_processor=self.merge_processor,
         )
         dl_val = create_embedding_webdataset(
             validation_url,
@@ -305,6 +328,7 @@ class XaresTask:
             num_workers=self.config.num_validation_workers,
             training=False,
             label_processor=self.label_processor,
+            merge_processor=self.merge_processor,
         )
 
         try:
@@ -312,8 +336,8 @@ class XaresTask:
         except RuntimeError as e:
             if "at least one example" in str(e):
                 raise RuntimeError(f"Empty dataloader. Try delete {self.encoded_ready_path} and re-run.")
-
-        self.trainer.run(dl_train, dl_val)
+            else:
+                raise e
 
     def evaluate_mlp(self, eval_url: list, load_ckpt: bool = False) -> Tuple[Dict[METRICS_TYPE, Any], int]:
         if self.trainer is None:
@@ -331,6 +355,8 @@ class XaresTask:
             batch_size=self.config.batch_size_train,
             num_workers=self.config.num_validation_workers,
             label_processor=self.label_processor,
+            merge_processor=self.merge_processor,
+            training=False,
         )
         return self.trainer.run_inference(dl)  # (result, size)
 
@@ -421,4 +447,4 @@ class XaresTask:
 
     def _make_splits(self):
         splits = self.config.k_fold_splits or [self.config.train_split, self.config.valid_split, self.config.test_split]
-        return list(filter(None, splits))
+        return list(filter(lambda x: x is not None, splits))
