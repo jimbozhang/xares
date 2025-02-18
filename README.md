@@ -8,34 +8,34 @@ X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It i
 
 ### Speech
 
-- [x] Speech Commands V2
-- [x] LibriCount
-- [x] VoxLingua107
-- [x] VoxCeleb1
-- [x] LibriSpeech-Male-Female
-- [x] Fluent Speech Commands
-- [x] VocalSound
-- [x] CREMA-D
-- [x] RAVDESS
-- [x] LibriSpeech-ASR
-- [ ] speechocean762
 - [x] ASV2015
+- [x] CREMA-D
+- [x] Fluent Speech Commands
+- [x] LibriCount
+- [x] LibriSpeech-ASR
+- [x] LibriSpeech-Male-Female
+- [x] RAVDESS
+- [x] Speech Commands V2
+- [ ] speechocean762
+- [x] VocalSound
+- [x] VoxCeleb1
+- [x] VoxLingua107
 
 ### Environment
 
+- [x] Clotho
+- [x] DESED
 - [x] ESC-50
+- [x] FSD18-Kaggle
 - [x] FSD50k
 - [x] UrbanSound 8k
-- [x] DESED
-- [x] FSD18-Kaggle
-- [x] Clotho
 
 ### Music
 
-- [x] MAESTRO
-- [x] GTZAN Genre
-- [x] NSynth
 - [x] FMA
+- [x] GTZAN Genre
+- [x] MAESTRO
+- [x] NSynth
 
 ## Installation
 
@@ -99,12 +99,12 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | esc50                        | **0.869** | 0.579    | 0.614     | 0.249     |
 | fluentspeechcommands_kws     | 0.916     | 0.417    | 0.878     | **0.962** |
 | freemusicarchive_genre       | **0.640** | 0.518    | 0.595     | 0.360     |
-| fsd50k                       | **0.408** | 0.165    |           |           |
+| fsd50k                       | **0.408** | 0.165    | 0.225     | 0.074     |
 | fsdkaggle2018                | **0.557** | 0.352    | 0.478     | 0.196     |
 | gtzan                        | **0.869** | 0.681    | 0.751     | 0.495     |
 | libricount                   | **0.688** | 0.605    | 0.549     | 0.507     |
+| librispeech_asr              | 0.061     | 0.---    | **0.---** | 0.---     |
 | librispeech_male_female      | 0.859     | 0.703    | **0.877** | 0.692     |
-| maestro                      |           |          |           |           |
 | nsynth_instument             | **0.261** | 0.251    | 0.259     | 0.223     |
 | ravdess                      | **0.725** | 0.440    | 0.460     | 0.469     |
 | speechcommandsv1             | **0.967** | 0.805    | 0.955     | 0.930     |
@@ -114,8 +114,6 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | voxceleb1                    | **0.512** | 0.069    | 0.215     | 0.043     |
 | voxlingua33                  | 0.782     | 0.492    | **0.862** | 0.577     |
 | **Weighted Average**         | **0.728** | 0.500    | 0.629     | 0.541     |
-
----
 
 ### kNN Result
 
@@ -129,7 +127,6 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | gtzan                         | **0.753** | 0.347    | 0.504     | 0.119     |
 | libricount                    | **0.310** | 0.241    | 0.253     | 0.186     |
 | librispeech_male_female       | 0.493     | 0.552    | 0.586     | **0.632** |
-| maestro                       |           |          |           |           |
 | nsynth_instument              | **0.253** | 0.235    | 0.233     | 0.209     |
 | ravdess                       | **0.369** | 0.171    | 0.287     | 0.289     |
 | speechcommandsv1              | **0.903** | 0.208    | 0.096     | 0.850     |
@@ -142,7 +139,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 
 ## Run with your own pretrained audio encoder
 
-Two examples of audio encoder wrapper could be found at `example/dasheng/dasheng_encoder.py` and `example/wav2vec2/wav2vec2.py`.
+Examples of audio encoder wrapper could be found at `examples`, where the baseline encoders are implemented.
 
 We provide a check function to verify if the encoder is correctly implemented:
 
