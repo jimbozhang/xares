@@ -19,7 +19,6 @@ def clotho_config(encoder) -> TaskConfig:
         merge_processor=data_merge_function_clotho,
         metric="recallatk_r1",
         name="clotho",
-        num_training_workers=4,
         pretrained_dependencies=["bert-base-uncased:tokenizer"],
         save_encoded_per_batches=500,
         task_type="contrastive",

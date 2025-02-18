@@ -235,7 +235,7 @@ def _clapscore(
         ret = result
     if select:
         ret = ret[select]
-    return ret
+    return ret / 100
 
 
 def weighted_average(scores_dict: Dict[str, List[Tuple[float, int]]]) -> List[float]:
