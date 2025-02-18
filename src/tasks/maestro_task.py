@@ -113,6 +113,7 @@ def maestro_config(encoder) -> TaskConfig:
         batch_size_encode=1,  # Long samples
         batch_size_train=1,  # Samples are very long, avoid extreme padding
         criterion="BCEWithLogitsLoss",
+        do_knn=False,
         encoder=encoder,
         epochs=50,
         label_processor=label_processor,
@@ -125,6 +126,5 @@ def maestro_config(encoder) -> TaskConfig:
         train_split="maestro_train",
         valid_split="maestro_valid",
         zenodo_id="14858022",
-        do_knn=False
     )
     return config
