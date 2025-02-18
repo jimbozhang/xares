@@ -124,8 +124,8 @@ class WerScore(Metric):
 
     def update(self, output):
         pred, target = output
-        self.pred.append(pred)
-        self.target.append(target)
+        self.pred.extend(pred)
+        self.target.extend(target)
 
     def reset(self):
         self._reset()

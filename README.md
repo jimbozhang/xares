@@ -17,7 +17,7 @@ X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It i
 - [x] VocalSound
 - [x] CREMA-D
 - [x] RAVDESS
-- [ ] LibriSpeech-ASR
+- [x] LibriSpeech-ASR
 - [ ] speechocean762
 - [x] ASV2015
 

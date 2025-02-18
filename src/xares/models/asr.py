@@ -166,7 +166,7 @@ class AsrModelForGeneration(nn.Module):
             encoded_audio=batch_a,
             attention_mask_a=None,
             input_ids=batch_t,
-            attention_mask_t=None,
+            attention_mask_t=torch.zeros_like(batch_t),
             labels=batch_t if return_loss else None,
         )
         if return_loss:
