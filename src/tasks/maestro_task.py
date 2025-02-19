@@ -114,7 +114,7 @@ def maestro_config(encoder) -> TaskConfig:
         batch_size_train=1,  # Samples are very long, avoid extreme padding
         criterion="BCEWithLogitsLoss",
         do_knn=False,
-        disabled=False,
+        disabled=True,
         encoder=encoder,
         epochs=50,
         label_processor=label_processor,
