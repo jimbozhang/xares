@@ -259,6 +259,7 @@ def fluentspeechcommands_config(encoder) -> TaskConfig:
         label_processor=lambda x: class_label_maps[x[data_key]],
         name="fluentspeechcommands",
         output_dim=len(class_label_maps),
+        batch_size_encode=1,
         test_split="fluentspeechcommands_test",
         train_split="fluentspeechcommands_train",
         valid_split="fluentspeechcommands_valid",
