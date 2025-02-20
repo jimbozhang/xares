@@ -312,6 +312,7 @@ def vocalimiations_config(encoder) -> TaskConfig:
         epochs=20,
         k_fold_splits=list(range(0, 3)),
         label_processor=lambda x: class_label_maps[x[task]],
+        batch_size_encode=1,
         name="vocalimitations",
         output_dim=len(class_label_maps),
         zenodo_id="14862060",
