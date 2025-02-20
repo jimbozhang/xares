@@ -92,7 +92,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 
 | Dataset                        | dasheng   | wav2vec2 | whisper   | data2vec  |
 |--------------------------------|-----------|----------|-----------|-----------|
-| asvspoof (mini)                | **0.963** | 0.914    | 0.885     | 0.892     |
+| asvspoof                       | **0.963** | 0.914    | 0.885     | 0.892     |
 | clotho                         | **0.033** | 0.018    | 0.029     | 0.006     |
 | crema_d                        | **0.772** | 0.568    | 0.600     | 0.566     |
 | desde                          | **0.532** | 0.081    | 0.125     | 0.137     |
@@ -113,7 +113,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | vocalsound                     | **0.910** | 0.791    | 0.871     | 0.807     |
 | voxceleb1                      | **0.780** | 0.340    | 0.205     | 0.103     |
 | voxlingua33                    | 0.813     | 0.557    | **0.855** | 0.617     |
-| **Weighted Average**           | **0.732** | 0.461    | 0.595     | 0.521     |
+| **Weighted Average**           | **0.696** | 0.384    | 0.646     | 0.565     |
 
 
 ### kNN Result
@@ -136,7 +136,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | vocalsound                     | **0.336** | 0.265    | 0.417     | 0.295     |
 | voxceleb1                      | **0.262** | 0.003    | 0.010     | 0.033     |
 | voxlingua33 (mini)             | **0.376** | 0.034    | 0.058     | 0.050     |
-| **Weighted Average**           | **0.437** | 0.245    | 0.266     | 0.331     |
+| **Weighted Average**           | **0.499** | 0.254    | 0.301     | 0.379     |
 
 ## Run with your own pretrained audio encoder
 
