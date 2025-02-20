@@ -92,51 +92,51 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 
 | Dataset                        | dasheng   | wav2vec2 | whisper   | data2vec  |
 |--------------------------------|-----------|----------|-----------|-----------|
-| asvspoof (mini)                | **0.956** | 0.914    | 0.885     | 0.892     |
+| asvspoof (mini)                | **0.963** | 0.914    | 0.885     | 0.892     |
 | clotho                         | **0.033** | 0.018    | 0.029     | 0.006     |
 | crema_d                        | **0.772** | 0.568    | 0.600     | 0.566     |
 | desde                          | **0.532** | 0.081    | 0.125     | 0.137     |
 | esc50                          | **0.869** | 0.579    | 0.614     | 0.249     |
 | fluentspeechcommands_kws       | 0.916     | 0.417    | 0.878     | **0.962** |
 | freemusicarchive_genre         | **0.640** | 0.518    | 0.595     | 0.360     |
-| fsd50k                         | **0.408** | 0.165    | 0.225     | 0.074     |
+| fsd50k                         | **0.408** | 0.166    | 0.262     | 0.084     |
 | fsdkaggle2018                  | **0.557** | 0.352    | 0.478     | 0.196     |
 | gtzan                          | **0.869** | 0.681    | 0.751     | 0.495     |
 | libricount                     | **0.688** | 0.605    | 0.549     | 0.507     |
 | librispeech_asr                | 0.612     | 0.001    | 0.802     | **0.860** |
-| librispeech_male_female (mini) | 0.859     | 0.703    | **0.877** | 0.692     |
-| nsynth_instument (mini)        | **0.651** | 0.404    | 0.408     | 0.266     |
+| librispeech_male_female        | **0.985** | 0.952    | 0.877     | 0.754     |
+| nsynth_instument               | **0.693** | 0.464    | 0.491     | 0.340     |
 | ravdess                        | **0.725** | 0.440    | 0.460     | 0.469     |
 | speechcommandsv1               | **0.967** | 0.805    | 0.955     | 0.930     |
 | urbansound8k                   | **0.835** | 0.676    | 0.719     | 0.443     |
 | vocalimiations                 | **0.238** | 0.108    | 0.197     | 0.112     |
 | vocalsound                     | **0.910** | 0.791    | 0.871     | 0.807     |
-| voxceleb1 (mini)               | **0.512** | 0.069    | 0.215     | 0.043     |
-| voxlingua33 (mini)             | 0.782     | 0.492    | **0.862** | 0.577     |
-| **Weighted Average**           | **0.676** | 0.395    | 0.575     | 0.492     |
+| voxceleb1                      | **0.780** | 0.340    | 0.205     | 0.103     |
+| voxlingua33                    | 0.813     | 0.557    | **0.855** | 0.617     |
+| **Weighted Average**           | **0.732** | 0.461    | 0.595     | 0.521     |
 
 
 ### kNN Result
 
 | Dataset                        | dasheng   | wav2vec2 | whisper   | data2vec  |
 |--------------------------------|-----------|----------|-----------|-----------|
-| asvspoof (mini)                | 0.833     | 0.611    | 0.600     | **0.919** |
+| asvspoof                       | 0.869     | 0.858    | 0.843     | **0.942** |
 | crema_d                        | 0.381     | 0.175    | **0.382** | 0.325     |
 | esc50                          | **0.621** | 0.091    | 0.191     | 0.037     |
 | fluentspeechcommands_kws       | **0.025** | 0.008    | 0.032     | 0.156     |
 | freemusicarchive_genre         | **0.589** | 0.135    | 0.396     | 0.126     |
 | gtzan                          | **0.753** | 0.347    | 0.504     | 0.119     |
 | libricount                     | **0.310** | 0.241    | 0.253     | 0.186     |
-| librispeech_male_female (mini) | 0.493     | 0.552    | 0.586     | **0.632** |
-| nsynth_instument (mini)        | **0.441** | 0.219    | 0.211     | 0.104     |
+| librispeech_male_female        | 0.493     | 0.552    | 0.586     | **0.632** |
+| nsynth_instument               | **0.441** | 0.219    | 0.211     | 0.104     |
 | ravdess                        | **0.369** | 0.171    | 0.287     | 0.289     |
 | speechcommandsv1               | **0.903** | 0.208    | 0.096     | 0.850     |
 | urbansound8k                   | **0.662** | 0.334    | 0.214     | 0.153     |
 | vocalimiations                 | **0.031** | 0.006    | 0.017     | 0.008     |
 | vocalsound                     | **0.336** | 0.265    | 0.417     | 0.295     |
-| voxceleb1 (mini)               | **0.035** | 0.002    | 0.007     | 0.001     |
-| voxlingua33 (mini)             | **0.340** | 0.014    | 0.207     | 0.050     |
-| **Weighted Average**           | **0.387** | 0.256    | 0.240     | 0.322     |
+| voxceleb1                      | **0.262** | 0.003    | 0.010     | 0.033     |
+| voxlingua33 (mini)             | **0.376** | 0.034    | 0.058     | 0.050     |
+| **Weighted Average**           | **0.437** | 0.245    | 0.266     | 0.331     |
 
 ## Run with your own pretrained audio encoder
 
