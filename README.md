@@ -164,7 +164,6 @@ python -m xares.run --max-jobs 8 your_encoder.py src/tasks/*.py
 By sure that your encoder supports variable length inference up to 10 minutes of audio.
 We recommend to simply chunk the input audio in your encoder to mitigate any out-of-memory issues, like:
 
-
 ```python
 class MyCustomEncoder(torch.nn.Module):
     def __init__(self):
