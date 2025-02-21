@@ -133,7 +133,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | speechcommandsv1               | **0.903** | 0.208    | 0.096     | 0.850     |
 | urbansound8k                   | **0.662** | 0.334    | 0.214     | 0.153     |
 | vocalimiations                 | **0.031** | 0.006    | 0.017     | 0.008     |
-| vocalsound                     | **0.336** | 0.265    | 0.417     | 0.295     |
+| vocalsound                     | 0.336 | 0.265    | **0.417**     | 0.295     |
 | voxceleb1                      | **0.262** | 0.003    | 0.010     | 0.033     |
 | voxlingua33 (mini)             | **0.376** | 0.034    | 0.058     | 0.050     |
 | **Weighted Average**           | **0.499** | 0.254    | 0.301     | 0.379     |
@@ -156,6 +156,41 @@ And then you can run the benchmark with your own encoder:
 
 ```bash
 python -m xares.run --max-jobs 8 your_encoder.py src/tasks/*.py
+```
+
+
+### Notes on Encoder implementation
+
+By sure that your encoder supports variable length inference up to 10 minutes of audio.
+We recommend to simply chunk the input audio in your encoder to mitigate any out-of-memory issues, like:
+
+```python
+class MyCustomEncoder(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.sampling_rate = 16000
+        self.output_dim = 512
+        self.hop_size_in_ms = 10
+        self.model = my_model_implementation()
+        # This code is only for cases where the model itself does not implement chunking
+        self.custom_max_audio_length = int(self.sampling_rate * 10)
+
+    def forward(self, audio: torch.Tensor):
+        if audio.ndim == 1:
+            audio = audio.unsqueeze(0)
+
+        self.model.eval()
+        with torch.inference_mode():
+            if audio.shape[-1] > self.custom_max_audio_length:
+                embeds = []
+                for chunk in x.split(self.max_length, dim=-1):
+                    embed = self.model(chunk)
+                    embeds.append(embed)
+                encoded_audio = torch.cat(embeds, dim=1)
+            else:
+                encoded_audio = self.model(audio)
+
+        return encoded_audio
 ```
 
 ## Add new tasks

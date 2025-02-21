@@ -37,7 +37,7 @@ class TaskConfig:
     seed: int = 42  # manual seed for all experiments
     label_processor: Callable | None = None
     merge_processor: Callable | None = None
-    task_type: Literal["frame", "clip", "contrastive"] = "clip"
+    task_type: Literal["frame", "clip", "contrastive", "asr"] = "clip"
 
     # Splits
     train_split: None | str = "train"
