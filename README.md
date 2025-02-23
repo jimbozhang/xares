@@ -89,8 +89,8 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 
 ### MLP Result
 
-| Dataset                        | dasheng   | wav2vec2 | whisper   | data2vec  |
-|--------------------------------|-----------|----------|-----------|-----------|
+| Task                           | dasheng   | wav2vec2 | whisper   | data2vec  |
+|:------------------------------:|:---------:|:--------:|:---------:|:---------:|
 | ASV2015                        | **0.963** | 0.914    | 0.885     | 0.892     |
 | Clotho                         | **0.033** | 0.018    | 0.029     | 0.006     |
 | CREMA-D                        | **0.772** | 0.568    | 0.600     | 0.566     |
@@ -116,8 +116,8 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 
 ### kNN Result
 
-| Dataset                        | dasheng   | wav2vec2 | whisper   | data2vec  |
-|--------------------------------|-----------|----------|-----------|-----------|
+| Task                           | dasheng   | wav2vec2 | whisper   | data2vec  |
+:------------------------------:|:---------:|:--------:|:---------:|:---------:|
 | ASV2015                        | 0.869     | 0.858    | 0.843     | **0.942** |
 | CREMA-D                        | 0.381     | 0.175    | **0.382** | 0.325     |
 | ESC-50                         | **0.621** | 0.091    | 0.191     | 0.037     |
