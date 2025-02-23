@@ -16,6 +16,8 @@ def gtzan_genre_config(encoder) -> TaskConfig:
     }
     config = TaskConfig(
         encoder=encoder,
+        evalset_size=100,
+        formal_name="GTZAN Genre",
         k_fold_splits=list(range(0, 10)),
         label_processor=lambda x: class_label_maps[x["genre"]],
         name="gtzan_genre",

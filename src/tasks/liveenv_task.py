@@ -36,6 +36,7 @@ def liveenv_config(encoder) -> TaskConfig:
 
     return TaskConfig(
         do_knn=False,
+        disabled=True,
         encoder=encoder,
         epochs=50,
         label_processor=lambda x: class_label_maps[x[data_key]],

@@ -1260,6 +1260,8 @@ def voxceleb1_config(encoder) -> TaskConfig:
     config = TaskConfig(
         encoder=encoder,
         epochs=5,
+        evalset_size=8251,
+        formal_name="VoxCeleb1",
         label_processor=lambda x: class_label_maps[x["speakerid"]],
         name="voxceleb1",
         output_dim=len(class_label_maps),

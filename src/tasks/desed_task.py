@@ -39,6 +39,8 @@ def desed_config(encoder) -> TaskConfig:
         criterion="BCEWithLogitsLoss",
         do_knn=False,
         encoder=encoder,
+        evalset_size=1153,
+        formal_name="DESED",
         label_processor=label_transform,
         metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms if encoder else 0, segment_length_in_s=1.0),
         metric="segmentf1",

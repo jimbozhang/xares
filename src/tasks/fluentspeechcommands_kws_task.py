@@ -256,6 +256,8 @@ def fluentspeechcommands_config(encoder) -> TaskConfig:
 
     return TaskConfig(
         encoder=encoder,
+        evalset_size=3793,
+        formal_name="Fluent Speech Commands",
         label_processor=lambda x: class_label_maps[x[data_key]],
         name="fluentspeechcommands",
         output_dim=len(class_label_maps),

@@ -6,6 +6,8 @@ from xares.task import TaskConfig
 def librispeech_male_female_config(encoder) -> TaskConfig:
     config = TaskConfig(
         encoder=encoder,
+        evalset_size=2620,
+        formal_name="LibriSpeech-MF",
         label_processor=lambda x: 0 if x["gender"] == "M" else 1,
         name="librispeechmalefemale",
         output_dim=2,

@@ -4,6 +4,8 @@ from xares.task import TaskConfig
 def esc50_config(encoder) -> TaskConfig:
     config = TaskConfig(
         encoder=encoder,
+        evalset_size=400,
+        formal_name="ESC-50",
         k_fold_splits=list(range(1, 6)),
         label_processor=lambda x: x["label"],
         name="esc50",

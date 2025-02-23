@@ -28,7 +28,7 @@ def worker(
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
     if config.disabled:
         logger.warning(f"Task {config.name} is disabled, skipping")
-        return (0, 0), (0, 0)
+        return ("", 0, 0), ("", 0, 0)
     task = XaresTask(config=config)
 
     # Run the task
@@ -59,7 +59,7 @@ def worker(
         logger.info(f"KNN score of {config.name}: {knn_score}")
 
     torch.cuda.empty_cache()
-    return mlp_score, knn_score
+    return task.config.formal_name, mlp_score, knn_score
 
 
 def stage_1(encoder_py, task_py, gpu_id):
@@ -171,16 +171,18 @@ def main(args):
         logger.info("Scoring completed: All tasks scored.")
 
         # Print results
-        df = pd.DataFrame(return_dict.items(), columns=["Task", "Scores"])
-        df["MLP_Score"] = df["Scores"].apply(lambda x: x[0][0])
-        df["KNN_Score"] = df["Scores"].apply(lambda x: x[1][0])
-        df["Task"] = df["Task"].str.replace(r".*/|_task\.py$", "", regex=True)
+        df = pd.DataFrame(return_dict.items(), columns=["py", "Scores"])
+        df.drop(columns=["py"], inplace=True)
+        df["Task"] = df["Scores"].apply(lambda x: x[0])
+        df["MLP_Score"] = df["Scores"].apply(lambda x: x[1][0])
+        df["KNN_Score"] = df["Scores"].apply(lambda x: x[2][0])
         df.drop(columns=["Scores"], inplace=True)
         df.sort_values(by="Task", inplace=True)
 
         print(f"\nResults:\n{df.to_string(index=False)}")
 
-        avg_mlp, avg_knn = weighted_average(return_dict)
+        avg_mlp, avg_knn = weighted_average({k: v[1:] for k, v in return_dict.items()})
+
         print("\nWeighted Average MLP Score:", avg_mlp)
         print("Weighted Average KNN Score:", avg_knn)
 
