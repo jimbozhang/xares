@@ -75,7 +75,6 @@ Alternatively, you can run tasks from within Python. Here is an example of runni
 >>> task.run()
 ```
 
-
 ## Baseline Results
 
 X-ARES provides two evaluation methods to assess the quality of audio representations: MLP (Linear Fine-Tuning) and kNN (Unparameterized Evaluation).
@@ -92,50 +91,49 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 
 | Dataset                        | dasheng   | wav2vec2 | whisper   | data2vec  |
 |--------------------------------|-----------|----------|-----------|-----------|
-| asvspoof                       | **0.963** | 0.914    | 0.885     | 0.892     |
-| clotho                         | **0.033** | 0.018    | 0.029     | 0.006     |
-| crema_d                        | **0.772** | 0.568    | 0.600     | 0.566     |
-| desde                          | **0.532** | 0.081    | 0.125     | 0.137     |
-| esc50                          | **0.869** | 0.579    | 0.614     | 0.249     |
-| fluentspeechcommands_kws       | 0.916     | 0.417    | 0.878     | **0.962** |
-| freemusicarchive_genre         | **0.640** | 0.518    | 0.595     | 0.360     |
-| fsd50k                         | **0.408** | 0.166    | 0.262     | 0.084     |
-| fsdkaggle2018                  | **0.557** | 0.352    | 0.478     | 0.196     |
-| gtzan                          | **0.869** | 0.681    | 0.751     | 0.495     |
-| libricount                     | **0.688** | 0.605    | 0.549     | 0.507     |
-| librispeech_asr                | 0.612     | 0.001    | 0.802     | **0.860** |
-| librispeech_male_female        | **0.985** | 0.952    | 0.877     | 0.754     |
-| nsynth_instument               | **0.693** | 0.464    | 0.491     | 0.340     |
-| ravdess                        | **0.725** | 0.440    | 0.460     | 0.469     |
-| speechcommandsv1               | **0.967** | 0.805    | 0.955     | 0.930     |
-| urbansound8k                   | **0.835** | 0.676    | 0.719     | 0.443     |
-| vocalimiations                 | **0.238** | 0.108    | 0.197     | 0.112     |
-| vocalsound                     | **0.910** | 0.791    | 0.871     | 0.807     |
-| voxceleb1                      | **0.780** | 0.340    | 0.205     | 0.103     |
-| voxlingua33                    | 0.813     | 0.557    | **0.855** | 0.617     |
+| ASV2015                        | **0.963** | 0.914    | 0.885     | 0.892     |
+| Clotho                         | **0.033** | 0.018    | 0.029     | 0.006     |
+| CREMA-D                        | **0.772** | 0.568    | 0.600     | 0.566     |
+| DESED                          | **0.532** | 0.081    | 0.125     | 0.137     |
+| ESC-50                         | **0.869** | 0.579    | 0.614     | 0.249     |
+| Fluent Speech Commands         | 0.916     | 0.417    | 0.878     | **0.962** |
+| Free Music Archive Small       | **0.640** | 0.518    | 0.595     | 0.360     |
+| FSD50k                         | **0.408** | 0.166    | 0.262     | 0.084     |
+| FSD18-Kaggle                   | **0.557** | 0.352    | 0.478     | 0.196     |
+| GTZAN Genre                    | **0.869** | 0.681    | 0.751     | 0.495     |
+| LibriCount                     | **0.688** | 0.605    | 0.549     | 0.507     |
+| LibriSpeech-100h               | 0.612     | 0.001    | 0.802     | **0.860** |
+| LibriSpeech-MF                 | **0.985** | 0.952    | 0.877     | 0.754     |
+| NSynth-Instruments             | **0.693** | 0.464    | 0.491     | 0.340     |
+| RAVDESS                        | **0.725** | 0.440    | 0.460     | 0.469     |
+| Speech Commands V1             | **0.967** | 0.805    | 0.955     | 0.930     |
+| UrbanSound 8k                  | **0.835** | 0.676    | 0.719     | 0.443     |
+| Vocal Imitation                | **0.238** | 0.108    | 0.197     | 0.112     |
+| VocalSound                     | **0.910** | 0.791    | 0.871     | 0.807     |
+| VoxCeleb1                      | **0.780** | 0.340    | 0.205     | 0.103     |
+| VoxLingua33                    | 0.813     | 0.557    | **0.855** | 0.617     |
 | **Weighted Average**           | **0.696** | 0.384    | 0.646     | 0.565     |
-
 
 ### kNN Result
 
 | Dataset                        | dasheng   | wav2vec2 | whisper   | data2vec  |
 |--------------------------------|-----------|----------|-----------|-----------|
-| asvspoof                       | 0.869     | 0.858    | 0.843     | **0.942** |
-| crema_d                        | 0.381     | 0.175    | **0.382** | 0.325     |
-| esc50                          | **0.621** | 0.091    | 0.191     | 0.037     |
-| fluentspeechcommands_kws       | **0.025** | 0.008    | 0.032     | 0.156     |
-| freemusicarchive_genre         | **0.589** | 0.135    | 0.396     | 0.126     |
-| gtzan                          | **0.753** | 0.347    | 0.504     | 0.119     |
-| libricount                     | **0.310** | 0.241    | 0.253     | 0.186     |
-| librispeech_male_female        | 0.493     | 0.552    | 0.586     | **0.632** |
-| nsynth_instument               | **0.441** | 0.219    | 0.211     | 0.104     |
-| ravdess                        | **0.369** | 0.171    | 0.287     | 0.289     |
-| speechcommandsv1               | **0.903** | 0.208    | 0.096     | 0.850     |
-| urbansound8k                   | **0.662** | 0.334    | 0.214     | 0.153     |
-| vocalimiations                 | **0.031** | 0.006    | 0.017     | 0.008     |
-| vocalsound                     | 0.336 | 0.265    | **0.417**     | 0.295     |
-| voxceleb1                      | **0.262** | 0.003    | 0.010     | 0.033     |
-| voxlingua33 (mini)             | **0.376** | 0.034    | 0.058     | 0.050     |
+| ASV2015                        | 0.869     | 0.858    | 0.843     | **0.942** |
+| CREMA-D                        | 0.381     | 0.175    | **0.382** | 0.325     |
+| ESC-50                         | **0.621** | 0.091    | 0.191     | 0.037     |
+| Fluent Speech Commands         | **0.025** | 0.008    | 0.032     | 0.156     |
+| Free Music Archive Small       | **0.589** | 0.135    | 0.396     | 0.126     |
+| GTZAN Genre                    | **0.753** | 0.347    | 0.504     | 0.119     |
+| LibriCount                     | **0.310** | 0.241    | 0.253     | 0.186     |
+| LibriSpeech-MF                 | 0.493     | 0.552    | 0.586     | **0.632** |
+| NSynth-Instruments             | **0.441** | 0.219    | 0.211     | 0.104     |
+| RAVDESS                        | **0.369** | 0.171    | 0.287     | 0.289     |
+| Speech Commands V1             | **0.903** | 0.208    | 0.096     | 0.850     |
+| UrbanSound 8k                  | **0.662** | 0.334    | 0.214     | 0.153     |
+| Vocal Imitation                | **0.031** | 0.006    | 0.017     | 0.008     |
+| VocalSound                     | 0.336 | 0.265    | **0.417**     | 0.295     |
+| VoxCeleb1                      | **0.262** | 0.003    | 0.010     | 0.033     |
+| VoxLingua33                    | **0.376** | 0.034    | 0.058     | 0.050     |
 | **Weighted Average**           | **0.499** | 0.254    | 0.301     | 0.379     |
 
 ## Run with your own pretrained audio encoder
@@ -157,7 +155,6 @@ And then you can run the benchmark with your own encoder:
 ```bash
 python -m xares.run --max-jobs 8 your_encoder.py src/tasks/*.py
 ```
-
 
 ### Notes on Encoder implementation
 

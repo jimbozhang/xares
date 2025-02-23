@@ -27,6 +27,7 @@ from xares.utils import download_hf_model_to_local, download_zenodo_record, mkdi
 @dataclass
 class TaskConfig:
     name: str
+    formal_name: str = ""
     xares_settings: XaresSettings = field(default_factory=XaresSettings)
     env_root: Path | str | None = None
     disabled: bool = False  # Skip the task, useful for debugging
@@ -38,13 +39,14 @@ class TaskConfig:
     label_processor: Callable | None = None
     merge_processor: Callable | None = None
     task_type: Literal["frame", "clip", "contrastive", "asr"] = "clip"
+    evalset_size: int = 0
 
     # Splits
     train_split: None | str = "train"
     valid_split: None | str = "valid"
     test_split: None | str = "test"
     k_fold_splits: None | List[int | str] = None
-    use_mini_dataset: bool = True  # For some large datasets, use subset for faster evaluation
+    use_mini_dataset: bool = False  # For some large datasets, use subset for faster evaluation
 
     # Audio tar
     force_download: bool = False
@@ -86,6 +88,12 @@ class TaskConfig:
     do_knn: bool = True
 
     def __post_init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        if self.formal_name == "":
+            self.formal_name = self.name
+
         self.update_tar_name_of_split()
         if self.env_root is None:
             self.env_root = self.xares_settings.env_root
@@ -93,8 +101,9 @@ class TaskConfig:
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
 
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+        self.eval_weight = min(2000, self.evalset_size)
+        if self.name == "librispeech":
+            self.eval_weight = 100000
 
     def update_tar_name_of_split(self):
         if self.k_fold_splits is not None:
@@ -358,7 +367,7 @@ class XaresTask:
             merge_processor=self.merge_processor,
             training=False,
         )
-        return self.trainer.run_inference(dl)  # (result, size)
+        return self.trainer.run_inference(dl), self.config.eval_weight
 
     def run_knn(self) -> Tuple[float, int]:
         knn_score = 0
@@ -436,7 +445,7 @@ class XaresTask:
             label_processor=self.label_processor,
         )
         knn_trainer = KNNTrainer(num_classes=self.config.output_dim)
-        return knn_trainer.train_and_eval(dl_train, dl_eval)
+        return knn_trainer.train_and_eval(dl_train, dl_eval), self.config.eval_weight
 
     def run(self):
         self.download_audio_tar()

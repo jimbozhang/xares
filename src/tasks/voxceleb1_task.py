@@ -1258,9 +1258,11 @@ def voxceleb1_config(encoder) -> TaskConfig:
         "id11251": 1250,
     }
     config = TaskConfig(
+        crop_length=6,
         encoder=encoder,
         epochs=10,
-        crop_length=6,
+        evalset_size=8251,
+        formal_name="VoxCeleb1",
         label_processor=lambda x: class_label_maps[x["speakerid"]],
         name="voxceleb1",
         output_dim=len(class_label_maps),

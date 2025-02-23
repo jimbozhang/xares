@@ -170,8 +170,7 @@ class Trainer:
         eval_metric.attach(local_evaluator, self.metric)
         local_evaluator.run(dl_eval)
 
-        dl_eval_size = local_evaluator.state.iteration
-        return local_evaluator.state.metrics[self.metric], dl_eval_size
+        return local_evaluator.state.metrics[self.metric]
 
     def run(self, dl_train, dl_dev):
         metrics = {"loss": Loss(self.model.criterion), self.metric: self._metric_obj.metric(**self.metric_args)}
@@ -282,10 +281,9 @@ class KNNTrainer:
             metric.attach(eval_engine, name)
 
         eval_engine.run(dl_eval)
-        dl_eval_size = sum(1 for _ in dl_eval)
         metrics = eval_engine.state.metrics
         logger.info(f"KNN {self.metric}: {metrics[self.metric]:.3f}")
-        return metrics[self.metric], dl_eval_size
+        return metrics[self.metric]
 
 
 if __name__ == "__main__":

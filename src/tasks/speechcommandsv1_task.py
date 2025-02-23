@@ -39,6 +39,8 @@ def speechcommandsv1_config(encoder) -> TaskConfig:
     return TaskConfig(
         batch_size_train=64,
         encoder=encoder,
+        evalset_size=6835,
+        formal_name="Speech Commands V1",
         label_processor=lambda x: class_label_maps[x[data_key]],
         learning_rate=1e-3,
         name="speechcommandsv1",

@@ -16,6 +16,8 @@ def clotho_config(encoder) -> TaskConfig:
         do_knn=False,
         encoder=encoder,
         epochs=20,
+        evalset_size=1045,
+        formal_name="Clotho",
         merge_processor=data_merge_function_clotho,
         metric="recallatk_r1",
         name="clotho",

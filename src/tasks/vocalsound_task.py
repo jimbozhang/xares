@@ -4,6 +4,8 @@ from xares.task import TaskConfig
 def vocalsound_config(encoder) -> TaskConfig:
     return TaskConfig(
         encoder=encoder,
+        evalset_size=3594,
+        formal_name="VocalSound",
         label_processor=lambda x: {
             "laughter": 0,
             "sigh": 1,

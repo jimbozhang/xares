@@ -6,9 +6,11 @@ from xares.task import TaskConfig
 def librispeech_asr_config(encoder) -> TaskConfig:
     config = TaskConfig(
         encoder=encoder,
+        evalset_size=2620,
         batch_size_train=1,
         disabled=True,
         do_knn=False,
+        formal_name="LibriSpeech-100h",
         gradient_accumulation_steps=32,
         label_processor=None,
         metric="WER_inv",

@@ -10,6 +10,8 @@ def asvspoof2015_config(encoder) -> TaskConfig:
         batch_size_train=64,
         encoder=encoder,
         epochs=5,
+        evalset_size=190948,
+        formal_name="ASV2015",
         label_processor=lambda x: class_label_maps[x[data_key]],
         learning_rate=1e-3,
         name="asvspoof2015",
