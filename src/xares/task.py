@@ -214,7 +214,7 @@ class XaresTask:
                 pad_last=True,  # Add crop
             )
             sink = wds.ShardWriter(
-                self.encoded_tar_path_of_split[split].as_posix().replace("*", f"0%05d"),
+                self.encoded_tar_path_of_split[split].as_posix().replace("*", "0%05d"),
                 encoder=False,
                 compress=False,
                 maxcount=self.config.save_encoded_per_batches,
@@ -274,7 +274,7 @@ class XaresTask:
                 eval_sizes.append(eval_size)
 
             for k in range(len(splits)):
-                logger.info(f"Fold {k+1} {self.config.metric}: {acc[k]}")
+                logger.info(f"Fold {k + 1} {self.config.metric}: {acc[k]}")
 
             avg_score = np.mean(acc)
             total_eval_size = int(np.average(eval_sizes))
@@ -404,7 +404,7 @@ class XaresTask:
                 eval_sizes.append(size)
 
             for k in range(len(splits)):
-                logger.info(f"Fold {k+1} {self.config.metric}: {scores[k]}")
+                logger.info(f"Fold {k + 1} {self.config.metric}: {scores[k]}")
 
             avg_score = np.mean(scores)
             total_eval_size = int(np.average(eval_sizes))

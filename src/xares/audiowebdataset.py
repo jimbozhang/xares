@@ -4,7 +4,7 @@ import json
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Literal, Optional, Sequence, Tuple, Union  # type: ignore
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union  # type: ignore
 
 import numpy as np
 import torch
@@ -61,7 +61,6 @@ def _seq_crop_audio(
 
 
 class Audiowebdataset(wds.DataPipeline):
-
     def __init__(
         self,
         urls,
@@ -146,9 +145,7 @@ class Audiowebdataset(wds.DataPipeline):
 
 # Can also replace with wds.Randomix
 class BalancedDatasetSampler(wds.DataPipeline, wds.compat.FluidInterface):
-
     def __init__(self, **datasets):
-
         super().__init__()
         self.datasets = datasets
 
@@ -228,7 +225,6 @@ def create_rawaudio_webdataset(
     pad_last: bool = False,  # If only 1 crop available, use padding
     **kwargs,
 ):
-
     dataset_kwargs = dict(
         batch_size=batch_size,
         rename_keys=(dict(audio="flac;mp3;sox;wav;m4a;ogg;wma", json="json", filename="__key__")),
@@ -259,7 +255,6 @@ def create_embedding_webdataset(
     merge_processor: None | Callable = None,
     **kwargs,
 ):
-
     dataset_kwargs = dict(
         tar_shuffle=tar_shuffle,
         batch_size=batch_size,

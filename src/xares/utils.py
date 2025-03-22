@@ -75,7 +75,7 @@ def download_zenodo_record(zenodo_id: str, target_dir: str, force_download: bool
         logger.info(f"Downloading completed: {zenodo_id} saved to {target_zip_path}.")
 
     try:
-        unzipped_flag = Path(target_dir) / f".unzipped"
+        unzipped_flag = Path(target_dir) / ".unzipped"
         if not unzipped_flag.exists():
             unzip_file(target_zip_path, target_dir)
             unzipped_flag.touch()

@@ -11,7 +11,7 @@ from ignite.handlers import CosineAnnealingScheduler, EpochOutputStore, global_s
 from ignite.handlers.tqdm_logger import ProgressBar
 from ignite.metrics import Loss, RunningAverage
 from loguru import logger
-from torch import Tensor, nn, optim
+from torch import Tensor, optim
 from torch.nn.functional import normalize
 
 from xares.metrics import ALL_METRICS, METRICS_TYPE
@@ -233,7 +233,6 @@ class KNN(torch.nn.Module):
         return topk_sims, neighbors_labels
 
     def compute_neighbors(self, test_data: torch.Tensor) -> tuple[Tensor, Tensor]:
-
         similarity_rank = test_data @ self.train_features
         candidate_labels = self.train_labels.expand(len(similarity_rank), -1)
         return self._get_knn_sims_and_labels(similarity_rank, candidate_labels)

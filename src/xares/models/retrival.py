@@ -3,7 +3,6 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from loguru import logger
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
