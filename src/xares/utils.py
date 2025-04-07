@@ -90,7 +90,10 @@ def download_zenodo_record(zenodo_id: str, target_dir: str, force_download: bool
 def attr_from_py_path(path: str, endswith: str | None = None) -> type:
     from importlib import import_module
 
-    module_name = path.replace("/", ".").strip(".py")
+    module_name = path.replace("/", ".")
+    # Strip ending
+    if module_name.endswith(".py"):
+        module_name = module_name[:-3]  # Remove last 3 characters (".py")
 
     try:
         module = import_module(module_name)
