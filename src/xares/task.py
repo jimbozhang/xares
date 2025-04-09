@@ -101,9 +101,7 @@ class TaskConfig:
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
 
-        self.eval_weight = min(2000, self.evalset_size)
-        if self.name == "librispeech":
-            self.eval_weight = 100000
+        self.eval_weight = self.evalset_size
 
     def update_tar_name_of_split(self):
         if self.k_fold_splits is not None:
@@ -250,7 +248,7 @@ class XaresTask:
                 lines = f.read().splitlines()
                 mlp_score = float(lines[0])
                 eval_size = int(lines[1])
-            logger.info(f"Loaded MLP score from {score_file}: {mlp_score}")
+            logger.info(f"Loaded MLP score from {score_file}: ({mlp_score}, {eval_size})")
             return mlp_score, eval_size
 
         if self.config.k_fold_splits:
@@ -296,7 +294,7 @@ class XaresTask:
 
         with open(score_file, "w") as f:
             f.write(f"{mlp_score}\n{eval_size}")
-        logger.info(f"Saved MLP score to {score_file}: {mlp_score}")
+        logger.info(f"Saved MLP score to {score_file}: ({mlp_score}, {eval_size})")
 
         return mlp_score, eval_size
 
@@ -383,7 +381,7 @@ class XaresTask:
                 lines = f.read().splitlines()
                 knn_score = float(lines[0])
                 eval_size = int(lines[1])
-            logger.info(f"Loaded KNN score from {score_file}: {knn_score}")
+            logger.info(f"Loaded KNN score from {score_file}: ({knn_score}, {eval_size})")
             return knn_score, eval_size
 
         if self.config.k_fold_splits:
@@ -424,7 +422,7 @@ class XaresTask:
 
         with open(score_file, "w") as f:
             f.write(f"{knn_score}\n{eval_size}")
-        logger.info(f"Saved KNN score to {score_file}: {knn_score}")
+        logger.info(f"Saved KNN score to {score_file}: ({knn_score}, {eval_size})")
 
         return knn_score, eval_size
 
