@@ -15,7 +15,7 @@ def ravdess_config(encoder) -> TaskConfig:
 
     config = TaskConfig(
         encoder=encoder,
-        evalset_size=360,
+        eval_weight=360,
         formal_name="RAVDESS",
         k_fold_splits=list(range(0, 4)),
         label_processor=lambda x: class_label_maps[x["emotion"]],

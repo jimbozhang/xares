@@ -8,7 +8,7 @@ def libricount_config(encoder) -> TaskConfig:
     config = TaskConfig(
         batch_size_train=64,
         encoder=encoder,
-        evalset_size=1144,
+        eval_weight=1144,
         formal_name="LibriCount",
         k_fold_splits=list(range(0, 5)),
         label_processor=lambda x: class_label_maps[x[task]],

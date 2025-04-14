@@ -117,7 +117,7 @@ def maestro_config(encoder) -> TaskConfig:
         disabled=False,
         encoder=encoder,
         epochs=50,
-        evalset_size=65,
+        eval_weight=65,
         formal_name="MAESTRO",
         label_processor=label_processor,
         metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms if encoder else 0, segment_length_in_s=0.1),

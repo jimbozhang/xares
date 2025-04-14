@@ -45,7 +45,7 @@ def voxlingua33_config(encoder) -> TaskConfig:
         crop_length=10,
         encoder=encoder,
         epochs=10,
-        evalset_size=1609,
+        eval_weight=1609,
         formal_name="VoxLingua33",
         label_processor=lambda x: class_label_maps[x["labels"]],
         learning_rate=1e-3,

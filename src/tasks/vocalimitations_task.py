@@ -310,7 +310,7 @@ def vocalimiations_config(encoder) -> TaskConfig:
     config = TaskConfig(
         encoder=encoder,
         epochs=20,
-        evalset_size=1867,
+        eval_weight=1867,
         formal_name="Vocal Imitation",
         k_fold_splits=list(range(0, 3)),
         label_processor=lambda x: class_label_maps[x[task]],

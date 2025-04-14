@@ -39,7 +39,7 @@ class TaskConfig:
     label_processor: Callable | None = None
     merge_processor: Callable | None = None
     task_type: Literal["frame", "clip", "contrastive", "asr"] = "clip"
-    evalset_size: int = 0
+    eval_weight: int = 0
 
     # Splits
     train_split: None | str = "train"
@@ -100,8 +100,6 @@ class TaskConfig:
         torch.set_num_threads(self.torch_num_threads)
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
-
-        self.eval_weight = self.evalset_size
 
     def update_tar_name_of_split(self):
         if self.k_fold_splits is not None:

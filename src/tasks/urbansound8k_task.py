@@ -16,7 +16,7 @@ def urbansound8k_config(encoder) -> TaskConfig:
     }
     config = TaskConfig(
         encoder=encoder,
-        evalset_size=873,
+        eval_weight=873,
         formal_name="UrbanSound 8k",
         k_fold_splits=list(range(1, 11)),
         label_processor=lambda x: class_label_maps[x["soundevent"]],

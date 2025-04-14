@@ -20,7 +20,7 @@ def nysnthinstument_config(encoder) -> TaskConfig:
     }
     config = TaskConfig(
         encoder=encoder,
-        evalset_size=2000,
+        eval_weight=2000,
         formal_name="NSynth-Instruments",
         label_processor=lambda x: class_label_maps[x[data_key]],
         name="nsynthinstument",

@@ -222,7 +222,7 @@ def fsd50k_config(encoder) -> TaskConfig:
         crop_length=10,  # 10s, even though samples are 30s
         do_knn=False,
         encoder=encoder,
-        evalset_size=2000,
+        eval_weight=2000,
         formal_name="FSD50k",
         label_processor=manyhot_label_map,
         metric="mAP",

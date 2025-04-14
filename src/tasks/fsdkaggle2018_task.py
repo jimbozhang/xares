@@ -51,7 +51,7 @@ def fsdkaggle2018_config(encoder) -> TaskConfig:
         do_knn=False,
         encoder=encoder,
         epochs=3,
-        evalset_size=1600,
+        eval_weight=1600,
         formal_name="FSD18-Kaggle",
         label_processor=lambda x: class_label_maps[x[data_key]],
         learning_rate=1e-3,

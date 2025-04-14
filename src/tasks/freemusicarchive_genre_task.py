@@ -17,7 +17,7 @@ def fma_genre_config(encoder) -> TaskConfig:
         crop_length=10,  # 10s
         encoder=encoder,
         epochs=3,
-        evalset_size=800,
+        eval_weight=800,
         formal_name="Free Music Archive Small",
         label_processor=lambda x: class_label_maps[x[data_key]],
         name="freemusicarchive",
