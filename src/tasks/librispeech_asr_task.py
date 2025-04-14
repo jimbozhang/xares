@@ -8,7 +8,7 @@ def librispeech_asr_config(encoder) -> TaskConfig:
         encoder=encoder,
         eval_weight=10000,
         batch_size_train=16,
-        disabled=False,
+        disabled=True,
         do_knn=False,
         formal_name="LibriSpeech-100h",
         gradient_accumulation_steps=4,
