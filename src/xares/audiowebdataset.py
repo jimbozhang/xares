@@ -163,13 +163,13 @@ def expand_with_brace(lists: Iterable[str] | str):
     import braceexpand
 
     r = []
-    for l in lists:
-        if "*" in l:
+    for path in lists:
+        if "*" in path:
             # Expand using "posix" based *
-            r.extend([str(f) for f in Path(l).parent.glob(Path(l).name)])
+            r.extend([str(f) for f in Path(path).parent.glob(Path(path).name)])
         else:
-            r.extend(braceexpand.braceexpand(l))
-        if any(not Path(l).exists() for l in r):
+            r.extend(braceexpand.braceexpand(path))
+        if any(not Path(expanded_path).exists() for expanded_path in r):
             raise FileNotFoundError(f"One of the paths does not exist: {r}")
     return r
 

@@ -29,17 +29,16 @@ class Data2VecEncoder(torch.nn.Module):
         self.model.save_pretrained(output_dir)
 
     def forward(self, audio):
-        assert isinstance(audio, torch.Tensor)  
+        assert isinstance(audio, torch.Tensor)
         if audio.ndim == 1:
             audio = audio.unsqueeze(0)
-        
+
         self.model.eval()
         if audio.shape[-1] > self.max_length:
             output = []
             for chunk in audio.split(self.max_length, dim=-1):
                 if chunk.shape[-1] < self.sampling_rate:
-                    chunk = torch.nn.functional.pad(
-                        chunk, (0, self.sampling_rate - chunk.shape[-1]))
+                    chunk = torch.nn.functional.pad(chunk, (0, self.sampling_rate - chunk.shape[-1]))
 
                 input_values = self.feature_extractor(
                     chunk, sampling_rate=self.sampling_rate, return_tensors="pt"
@@ -48,7 +47,7 @@ class Data2VecEncoder(torch.nn.Module):
                     input_values = input_values.unsqueeze(0)
                 tmp_output = self.model(input_values.to(self.model.device))["last_hidden_state"]
                 output.append(tmp_output)
-            output = torch.cat(output, dim = 1)
+            output = torch.cat(output, dim=1)
         else:
             input_values = self.feature_extractor(
                 audio, sampling_rate=self.sampling_rate, return_tensors="pt"
@@ -58,7 +57,6 @@ class Data2VecEncoder(torch.nn.Module):
 
             output = self.model(input_values.to(self.model.device))["last_hidden_state"]
         return output
-
 
 
 if __name__ == "__main__":

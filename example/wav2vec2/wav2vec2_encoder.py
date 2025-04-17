@@ -29,16 +29,14 @@ class Wav2vec2Encoder(torch.nn.Module):
         self.model.save_pretrained(output_dir)
 
     def forward(self, audio: torch.Tensor):
-        assert isinstance(audio, torch.Tensor)  
+        assert isinstance(audio, torch.Tensor)
         if audio.ndim == 1:
             audio = audio.unsqueeze(0)
-        device = audio.device
         if audio.shape[-1] > self.max_length:
             output = []
             for chunk in audio.split(self.max_length, dim=-1):
                 if chunk.shape[-1] < self.sampling_rate:
-                    chunk = torch.nn.functional.pad(
-                        chunk, (0, self.sampling_rate - chunk.shape[-1]))
+                    chunk = torch.nn.functional.pad(chunk, (0, self.sampling_rate - chunk.shape[-1]))
 
                 input_values = self.feature_extractor(
                     chunk, sampling_rate=self.sampling_rate, return_tensors="pt"
@@ -46,10 +44,10 @@ class Wav2vec2Encoder(torch.nn.Module):
 
                 if input_values.dim() == 1:
                     input_values = input_values.unsqueeze(0)
-                
+
                 tmp_output = self.model(input_values.to(self.model.device))["last_hidden_state"]
                 output.append(tmp_output)
-            output = torch.cat(output, dim = 1)
+            output = torch.cat(output, dim=1)
         else:
             input_values = self.feature_extractor(
                 audio, sampling_rate=self.sampling_rate, return_tensors="pt"
@@ -62,7 +60,9 @@ class Wav2vec2Encoder(torch.nn.Module):
 
         return output
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     from xares.audio_encoder_checker import check_audio_encoder
+
     encoder = Wav2vec2Encoder()
     assert check_audio_encoder(encoder)
