@@ -91,50 +91,50 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 
 | Task                           | dasheng   | wav2vec2 | whisper   | data2vec  |
 |:------------------------------:|:---------:|:--------:|:---------:|:---------:|
-| ASV2015                        | **0.963** | 0.914    | 0.885     | 0.892     |
-| Clotho                         | **0.033** | 0.018    | 0.029     | 0.006     |
-| CREMA-D                        | **0.772** | 0.568    | 0.600     | 0.566     |
-| DESED                          | **0.532** | 0.081    | 0.125     | 0.137     |
-| ESC-50                         | **0.869** | 0.579    | 0.614     | 0.249     |
-| Fluent Speech Commands         | 0.916     | 0.417    | 0.878     | **0.962** |
-| Free Music Archive Small       | **0.640** | 0.518    | 0.595     | 0.360     |
-| FSD50k                         | **0.408** | 0.166    | 0.262     | 0.084     |
-| FSD18-Kaggle                   | **0.557** | 0.352    | 0.478     | 0.196     |
-| GTZAN Genre                    | **0.869** | 0.681    | 0.751     | 0.495     |
-| LibriCount                     | **0.688** | 0.605    | 0.549     | 0.507     |
-| LibriSpeech-100h               | 0.612     | 0.001    | 0.802     | **0.860** |
-| LibriSpeech-MF                 | **0.985** | 0.952    | 0.877     | 0.754     |
-| NSynth-Instruments             | **0.693** | 0.464    | 0.491     | 0.340     |
-| RAVDESS                        | **0.725** | 0.440    | 0.460     | 0.469     |
-| Speech Commands V1             | **0.967** | 0.805    | 0.955     | 0.930     |
-| UrbanSound 8k                  | **0.835** | 0.676    | 0.719     | 0.443     |
-| Vocal Imitation                | **0.238** | 0.108    | 0.197     | 0.112     |
+| ASV2015                        | **0.964** | 0.914    | 0.885     | 0.892     |
+| Clotho                         | **0.029** | 0.018    | 0.029     | 0.006     |
+| CREMA-D                        | **0.767** | 0.568    | 0.600     | 0.566     |
+| DESED                          | **0.537** | 0.081    | 0.125     | 0.137     |
+| ESC-50                         | **0.857** | 0.579    | 0.614     | 0.249     |
+| Fluent Speech Commands         | 0.946     | 0.417    | 0.878     | **0.962** |
+| Free Music Archive Small       | **0.643** | 0.518    | 0.595     | 0.360     |
+| FSD50k                         | **0.409** | 0.166    | 0.262     | 0.084     |
+| FSD18-Kaggle                   | **0.534** | 0.352    | 0.478     | 0.196     |
+| GTZAN Genre                    | **0.851** | 0.681    | 0.751     | 0.495     |
+| LibriCount                     | **0.681** | 0.605    | 0.549     | 0.507     |
+| LibriSpeech-100h               | 0.713     | 0.001    | 0.802     | **0.860** |
+| LibriSpeech-MF                 | **0.986** | 0.952    | 0.877     | 0.754     |
+| NSynth-Instruments             | **0.688** | 0.464    | 0.491     | 0.340     |
+| RAVDESS                        | **0.749** | 0.440    | 0.460     | 0.469     |
+| Speech Commands V1             | **0.969** | 0.805    | 0.955     | 0.930     |
+| UrbanSound 8k                  | **0.833** | 0.676    | 0.719     | 0.443     |
+| Vocal Imitation                | **0.253** | 0.108    | 0.197     | 0.112     |
 | VocalSound                     | **0.910** | 0.791    | 0.871     | 0.807     |
 | VoxCeleb1                      | **0.780** | 0.340    | 0.205     | 0.103     |
-| VoxLingua33                    | 0.813     | 0.557    | **0.855** | 0.617     |
-| **Weighted Average**           | **0.696** | 0.384    | 0.646     | 0.565     |
+| VoxLingua33                    | 0.814     | 0.557    | **0.855** | 0.617     |
+| **Weighted Average**           | **0.721** | 0.384    | 0.646     | 0.565     |
 
 ### kNN Result
 
 | Task                           | dasheng   | wav2vec2 | whisper   | data2vec  |
 :------------------------------:|:---------:|:--------:|:---------:|:---------:|
 | ASV2015                        | 0.869     | 0.858    | 0.843     | **0.942** |
-| CREMA-D                        | 0.381     | 0.175    | **0.382** | 0.325     |
-| ESC-50                         | **0.621** | 0.091    | 0.191     | 0.037     |
-| Fluent Speech Commands         | **0.025** | 0.008    | 0.032     | 0.156     |
-| Free Music Archive Small       | **0.589** | 0.135    | 0.396     | 0.126     |
-| GTZAN Genre                    | **0.753** | 0.347    | 0.504     | 0.119     |
-| LibriCount                     | **0.310** | 0.241    | 0.253     | 0.186     |
-| LibriSpeech-MF                 | 0.493     | 0.552    | 0.586     | **0.632** |
-| NSynth-Instruments             | **0.441** | 0.219    | 0.211     | 0.104     |
-| RAVDESS                        | **0.369** | 0.171    | 0.287     | 0.289     |
+| CREMA-D                        | 0.380     | 0.175    | **0.382** | 0.325     |
+| ESC-50                         | **0.618** | 0.091    | 0.191     | 0.037     |
+| Fluent Speech Commands         | **0.260** | 0.008    | 0.032     | 0.156     |
+| Free Music Archive Small       | **0.592** | 0.135    | 0.396     | 0.126     |
+| GTZAN Genre                    | **0.758** | 0.347    | 0.504     | 0.119     |
+| LibriCount                     | **0.311** | 0.241    | 0.253     | 0.186     |
+| LibriSpeech-MF                 | 0.791     | 0.552    | 0.586     | **0.632** |
+| NSynth-Instruments             | **0.499** | 0.219    | 0.211     | 0.104     |
+| RAVDESS                        | **0.408** | 0.171    | 0.287     | 0.289     |
 | Speech Commands V1             | **0.903** | 0.208    | 0.096     | 0.850     |
 | UrbanSound 8k                  | **0.662** | 0.334    | 0.214     | 0.153     |
-| Vocal Imitation                | **0.031** | 0.006    | 0.017     | 0.008     |
-| VocalSound                     | 0.336 | 0.265    | **0.417**     | 0.295     |
+| Vocal Imitation                | **0.107** | 0.006    | 0.017     | 0.008     |
+| VocalSound                     | 0.382 | 0.265    | **0.417**     | 0.295     |
 | VoxCeleb1                      | **0.262** | 0.003    | 0.010     | 0.033     |
 | VoxLingua33                    | **0.376** | 0.034    | 0.058     | 0.050     |
-| **Weighted Average**           | **0.499** | 0.254    | 0.301     | 0.379     |
+| **Weighted Average**           | **0.504** | 0.254    | 0.301     | 0.379     |
 
 ## Run with your own pretrained audio encoder
 
@@ -180,7 +180,11 @@ class MyCustomEncoder(torch.nn.Module):
         with torch.inference_mode():
             if audio.shape[-1] > self.custom_max_audio_length:
                 embeds = []
-                for chunk in x.split(self.max_length, dim=-1):
+                for chunk in audio.split(self.custom_max_audio_length, dim=-1):
+                    if chunk.shape[-1] < self.sampling_rate:
+                        chunk = torch.nn.functional.pad(
+                            chunk, (0, self.sampling_rate - chunk.shape[-1]))
+                    
                     embed = self.model(chunk)
                     embeds.append(embed)
                 encoded_audio = torch.cat(embeds, dim=1)

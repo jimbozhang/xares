@@ -74,7 +74,6 @@ class TaskConfig:
         "CrossEntropyLoss"
     )
     batch_size_train: int = 32
-    gradient_accumulation_steps: int = 1
     learning_rate: float = 1e-3
     epochs: int = 10
     num_training_workers: int = 0
@@ -307,7 +306,6 @@ class XaresTask:
             ckpt_name=self.config.ckpt_name,
             metric=self.config.metric,
             metric_args=self.config.metric_args,
-            gradient_accumulation_steps=self.config.gradient_accumulation_steps,
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
             task_type=self.config.task_type,
