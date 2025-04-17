@@ -95,7 +95,6 @@ class Trainer:
     )
     optimizer: str = "Adam"
     lr: float = 3e-3
-    gradient_accumulation_steps: int = 1
     max_epochs: int = 10
     ckpt_dir: str = "checkpoints"
     best_ckpt_path: str | None = None
@@ -152,9 +151,8 @@ class Trainer:
             loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
             loss.backward()
 
-            if (engine.state.iteration - 1) % self.gradient_accumulation_steps == 0:
-                self.optimizer.step()
-                self.optimizer.zero_grad()
+            self.optimizer.step()
+            self.optimizer.zero_grad()
 
             return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 

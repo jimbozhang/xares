@@ -180,7 +180,11 @@ class MyCustomEncoder(torch.nn.Module):
         with torch.inference_mode():
             if audio.shape[-1] > self.custom_max_audio_length:
                 embeds = []
-                for chunk in x.split(self.max_length, dim=-1):
+                for chunk in audio.split(self.custom_max_audio_length, dim=-1):
+                    if chunk.shape[-1] < self.sampling_rate:
+                        chunk = torch.nn.functional.pad(
+                            chunk, (0, self.sampling_rate - chunk.shape[-1]))
+                    
                     embed = self.model(chunk)
                     embeds.append(embed)
                 encoded_audio = torch.cat(embeds, dim=1)
