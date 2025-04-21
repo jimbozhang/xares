@@ -107,7 +107,8 @@ def compute_eer(pred, target, positive_label: int = 1):
     return eer
 
 
-EERMetric = lambda: EpochMetric(compute_fn=compute_eer)
+def EERMetric():
+    return EpochMetric(compute_fn=compute_eer)
 
 
 class WerScore(Metric):
