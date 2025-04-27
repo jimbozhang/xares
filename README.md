@@ -29,6 +29,11 @@ X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It i
 - [x] FSD18-Kaggle
 - [x] FSD50k
 - [x] UrbanSound 8k
+- [x] Finger snap sound[^priv]
+- [x] Inside/outside car[^priv]
+- [x] Key scratching car[^priv]
+- [x] LiveEnv sounds[^priv]
+- [ ] Subway broadcast[^priv]
 
 ### Music
 
