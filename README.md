@@ -114,7 +114,8 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | VoxLingua33                    | 0.814     | 0.553    | **0.873** | 0.620     |
 | Key scratching car[^priv]      | **0.999** | 0.983    | 0.985     | 0.909     |
 | Finger snap sound[^priv]       | 0.870     | **0.872** | 0.861    | 0.808     |
-| **Weighted Average**           | **0.747** | 0.581    | 0.692     | 0.652     |
+| Inside/outside car[^priv]      | **0.972** | 0.928    | 0.866     | 0.869     |
+| **Weighted Average**           | **0.694** | 0.485    | 0.628     | 0.594     |
 
 ### kNN Result
 
@@ -138,7 +139,8 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | VoxLingua33                    | **0.376** | 0.034    | 0.360     | 0.058     |
 | Key scratching car[^priv]      | **0.955** | 0.923    | 0.691     | 0.550     |
 | Finger snap sound[^priv]       | **0.848** | 0.787    | 0.401     | 0.461     |
-| **Weighted Average**           | **0.625** | 0.443    | 0.374     | 0.423     |
+| Inside/outside car[^priv]      | **0.798** | 0.575    | 0.730     | 0.588     |
+| **Weighted Average**           | **0.504** | 0.262    | 0.299     | 0.388     |
 
 [^priv]: These tasks are private and use datasets that are not publicly available.
 
