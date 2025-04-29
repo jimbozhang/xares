@@ -59,7 +59,7 @@ def worker(
         logger.info(f"KNN score of {config.name}: {knn_score}")
 
     torch.cuda.empty_cache()
-    return task.config.formal_name, mlp_score, knn_score
+    return task.config.formal_name, mlp_score, knn_score, task.config.private
 
 
 def stage_1(encoder_py, task_py, gpu_id):
@@ -176,15 +176,20 @@ def main(args):
         df["Task"] = df["Scores"].apply(lambda x: x[0])
         df["MLP_Score"] = df["Scores"].apply(lambda x: x[1][0])
         df["KNN_Score"] = df["Scores"].apply(lambda x: x[2][0])
+        df['Private']   = df["Scores"].apply(lambda x: x[3])
         df.drop(columns=["Scores"], inplace=True)
         df.sort_values(by="Task", inplace=True)
 
         print(f"\nResults:\n{df.to_string(index=False)}")
 
-        avg_mlp, avg_knn = weighted_average({k: v[1:] for k, v in return_dict.items()})
+        avg_mlp_all, avg_knn_all = weighted_average({k: v[1:-1] for k, v in return_dict.items()})
+        avg_mlp_public, avg_knn_public = weighted_average({k: v[1:-1] for k, v in return_dict.items() if v[-1] == True})
 
-        print("\nWeighted Average MLP Score:", avg_mlp)
-        print("Weighted Average KNN Score:", avg_knn)
+        print("\nWeighted Average MLP Score for All Datasets:", avg_mlp_all)
+        print("Weighted Average KNN Score for All Datasets:", avg_knn_all)
+
+        print("\nWeighted Average MLP Score for Public Datasets:", avg_mlp_public)
+        print("Weighted Average KNN Score for Public Datasets:", avg_knn_public)
 
 
 if __name__ == "__main__":
