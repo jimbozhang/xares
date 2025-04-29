@@ -59,7 +59,4 @@ if __name__ == "__main__":
     from xares.audio_encoder_checker import check_audio_encoder
 
     encoder = WhisperEncoder()
-    print(encoder.hop_size_in_ms)
-    out = encoder(torch.rand(1, 16000));
-    print(out.shape)
     assert check_audio_encoder(encoder)
