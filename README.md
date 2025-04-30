@@ -122,8 +122,8 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | Inside/outside car[^priv]      | **0.972** | 0.928    | 0.866     | 0.869     |
 | Live Env [^priv]               | **0.986** | 0.955    | 0.887     | 0.759     |
 | Subway broadcast[^priv]        | **0.972** | 0.930    | 0.942     | 0.869     |
-| **Weighted Average[^public]**  | **0.694** | 0.485    | 0.628     | 0.594     |
-| **Weighted Average[^all]**     | **0.801** | 0.665    | 0.741     | 0.695     |
+| **Weighted Average (public tasks)**  | **0.694** | 0.485    | 0.628     | 0.594     |
+| **Weighted Average (all tasks)**     | **0.801** | 0.665    | 0.741     | 0.695     |
 
 
 ### kNN Result
@@ -150,12 +150,10 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | Finger snap sound[^priv]       | **0.848** | 0.787    | 0.401     | 0.461     |
 | Inside/outside car[^priv]      | **0.798** | 0.575    | 0.730     | 0.588     |
 | Subway broadcast[^priv]        | **0.949** | 0.533    | 0.884     | 0.530     |
-| **Weighted Average[^public]**  | **0.504** | 0.262    | 0.299     | 0.388     |
-| **Weighted Average[^all]**     | **0.683** | 0.469    | 0.475     | 0.455     |
+| **Weighted Average (public tasks)**  | **0.504** | 0.262    | 0.299     | 0.388     |
+| **Weighted Averag (all tasks)**      | **0.683** | 0.469    | 0.475     | 0.455     |
 
 [^priv]: These tasks are private and use datasets that are not publicly available.
-[^public]: Weighted average scores for public datasets.
-[^all]: Weight average score for all datasets.
 
 ## Run with your own pretrained audio encoder
 
