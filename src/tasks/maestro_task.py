@@ -121,7 +121,7 @@ def maestro_config(encoder) -> TaskConfig:
         formal_name="MAESTRO",
         label_processor=label_processor,
         metric_args=dict(hop_size_in_ms=encoder.hop_size_in_ms if encoder else 0, segment_length_in_s=0.1),
-        metric="segmentf1",
+        metric="segmentf1_micro",
         name="maestro",
         output_dim=len(class_label_maps),
         task_type="frame",
