@@ -114,7 +114,6 @@ def maestro_config(encoder) -> TaskConfig:
         batch_size_train=1,  # Samples are very long, avoid extreme padding
         criterion=torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor(10)),
         do_knn=False,
-        disabled=True,
         encoder=encoder,
         epochs=50,
         eval_weight=65,
