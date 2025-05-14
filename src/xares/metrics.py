@@ -10,7 +10,17 @@ import numpy as np
 import torch
 from ignite.metrics import Accuracy, AveragePrecision, EpochMetric, MeanAbsoluteError, MeanSquaredError, Metric
 
-METRICS_TYPE = Literal["accuracy", "EER", "mAP", "recallatk_r1", "MAE", "MSE", "segmentf1", "WER_inv"]
+METRICS_TYPE = Literal[
+    "accuracy",
+    "EER",
+    "mAP",
+    "recallatk_r1",
+    "MAE",
+    "MSE",
+    "segmentf1_macro",
+    "segmentf1_micro",
+    "WER_inv",
+]
 
 
 @dataclass
@@ -60,10 +70,18 @@ class ClapScore(Metric):
 
 
 class SegmentF1Metric(Metric):
-    def __init__(self, *args, output_transform=lambda x: x, hop_size_in_ms: float, segment_length_in_s: float = 1.0):
+    def __init__(
+        self,
+        *args,
+        output_transform=lambda x: x,
+        hop_size_in_ms: float,
+        segment_length_in_s: float = 1.0,
+        average: Literal["micro", "macro"],
+    ):
         super().__init__(*args, output_transform=output_transform)
         self._reset()
         self.max_pooling_size = math.ceil(segment_length_in_s / (hop_size_in_ms / 1000.0))
+        self.average = average
 
     def _reset(self):
         self.pred, self.targets = [], []
@@ -93,7 +111,7 @@ class SegmentF1Metric(Metric):
         # Binary classification, preds need to be {0,1} and targets
         pred = torch.cat(self.pred).long().cpu().numpy()
         tar = torch.cat(self.targets).long().cpu().numpy()
-        return f1_score(tar, pred, average="macro")
+        return f1_score(tar, pred, average=self.average)
 
 
 def compute_eer(pred, target, positive_label: int = 1):
@@ -144,8 +162,11 @@ ALL_METRICS: Dict[METRICS_TYPE, EvalMetric] = dict(
         partial(AveragePrecision, output_transform=lambda x: (torch.flatten(x[0], 0, 1), torch.flatten(x[1], 0, 1))),
         score=1.0,
     ),
-    segmentf1=EvalMetric(
-        partial(SegmentF1Metric, output_transform=lambda x: (x[0].sigmoid().round(), x[1])), score=1.0
+    segmentf1_macro=EvalMetric(
+        partial(SegmentF1Metric, output_transform=lambda x: (x[0].sigmoid().round(), x[1]), average="macro"), score=1.0
+    ),
+    segmentf1_micro=EvalMetric(
+        partial(SegmentF1Metric, output_transform=lambda x: (x[0].sigmoid().round(), x[1]), average="micro"), score=1.0
     ),
     mAP=EvalMetric(AveragePrecision, score=1.0),
     MAE=EvalMetric(MeanAbsoluteError, score=-1.0),

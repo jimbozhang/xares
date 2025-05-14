@@ -1,4 +1,5 @@
 import os
+from typing import Callable
 
 import torch
 import torch.nn as nn
@@ -44,7 +45,7 @@ class RetrivalMLP(nn.Module):
         in_features,
         hidden_features: int = 1024,
         out_features: int | None = None,
-        criterion="AudioTextContrastiveLoss",
+        criterion: str | Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = "AudioTextContrastiveLoss",
     ):
         super().__init__()
         out_features = out_features or hidden_features
@@ -64,7 +65,7 @@ class RetrivalMLP(nn.Module):
             nn.Linear(hidden_features, out_features),
         )
 
-        self.criterion = globals()[criterion]()
+        self.criterion = globals()[criterion]() if isinstance(criterion, str) else criterion
 
     def forward(self, x: torch.Tensor, text: torch.Tensor, return_loss: bool = False):
         text_inputs = self.tokenizer(text, return_tensors="pt", padding=True)

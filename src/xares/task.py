@@ -70,9 +70,10 @@ class TaskConfig:
     ckpt_dir_name = "checkpoints"
     embedding_dir_name = "embeddings"
     ckpt_name = "best.ckpt"
-    criterion: Literal["CrossEntropyLoss", "BCEWithLogitsLoss", "L1Loss", "MSELoss", "AudioTextContrastiveLoss"] = (
-        "CrossEntropyLoss"
-    )
+    criterion: (
+        Literal["CrossEntropyLoss", "BCEWithLogitsLoss", "L1Loss", "MSELoss", "AudioTextContrastiveLoss"]
+        | Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
+    ) = "CrossEntropyLoss"
     batch_size_train: int = 32
     learning_rate: float = 1e-3
     epochs: int = 10

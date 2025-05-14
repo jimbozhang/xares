@@ -39,7 +39,7 @@ X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It i
 
 - [x] FMA
 - [x] GTZAN Genre
-- [ ] MAESTRO
+- [x] MAESTRO
 - [x] NSynth
 
 ## Installation
@@ -109,6 +109,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | LibriCount                     | **0.681** | 0.583    | 0.549     | 0.492     |
 | LibriSpeech-100h               | 0.608     | 0.405    | 0.721     | **0.893** |
 | LibriSpeech-MF                 | **0.986** | 0.948    | 0.973     | 0.752     |
+| MAESTRO                        | **0.524** | 0.180    | 0.011     | 0.116     |
 | NSynth-Instruments             | **0.688** | 0.443    | 0.532     | 0.336     |
 | RAVDESS                        | **0.749** | 0.442    | 0.459     | 0.467     |
 | Speech Commands V1             | **0.969** | 0.714    | 0.933     | 0.927     |
@@ -122,8 +123,8 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | Inside/outside car[^priv]      | **0.972** | 0.928    | 0.866     | 0.869     |
 | Live Env [^priv]               | **0.986** | 0.955    | 0.887     | 0.759     |
 | Subway broadcast[^priv]        | **0.972** | 0.930    | 0.942     | 0.869     |
-| **Weighted Average (public tasks)**  | **0.694** | 0.485    | 0.628     | 0.594     |
-| **Weighted Average (all tasks)**     | **0.801** | 0.665    | 0.741     | 0.695     |
+| **Weighted Average (public tasks)**  | **0.699** | 0.490    | 0.632     | 0.598     |
+| **Weighted Average (all tasks)**     | **0.801** | 0.664    | 0.740     | 0.694     |
 
 
 ### kNN Result
