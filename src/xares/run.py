@@ -183,7 +183,7 @@ def main(args):
         print(f"\nResults:\n{df.to_string(index=False)}")
 
         avg_mlp_all, avg_knn_all = weighted_average({k: v[1:-1] for k, v in return_dict.items()})
-        avg_mlp_public, avg_knn_public = weighted_average({k: v[1:-1] for k, v in return_dict.items() if v[-1] == True})
+        avg_mlp_public, avg_knn_public = weighted_average({k: v[1:-1] for k, v in return_dict.items() if v[-1] == False})
 
         print("\nWeighted Average MLP Score for All Datasets:", avg_mlp_all)
         print("Weighted Average KNN Score for All Datasets:", avg_knn_all)
