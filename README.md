@@ -1,5 +1,9 @@
 # X-ARES: eXtensive Audio Representation and Evaluation Suite
 
+[![arxiv](https://img.shields.io/badge/arXiv-2505.16369-b31b1b)](https://arxiv.org/abs/2505.16369)
+[![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![webdataset](https://img.shields.io/badge/webdataset-0.2-76a059)](https://github.com/webdataset/webdataset)
+
 ## Introduction
 
 X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/).
