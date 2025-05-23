@@ -32,7 +32,7 @@ def masked_mean(x, x_length, dim: int = -1):
 
 def cast_to_tensor(y: Iterable):
     y = y if isinstance(y, torch.Tensor) else torch.tensor(y)
-    return y.float() if y.is_floating_point() else y
+    return y.float() if y.is_floating_point() else y.long()
 
 
 def pad_or_trim(tensor, target_size):
