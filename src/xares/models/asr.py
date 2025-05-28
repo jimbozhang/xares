@@ -59,7 +59,7 @@ class Decoder(nn.Module):
     ) -> Tuple[List[Tensor], Tensor]:
         assert encoded_audio is not None or input_ids is not None, "Either encoded_audio or input_ids must be provided"
         assert self.transformer.device == self.encoder_adapter.fc_1.weight.device
-        with torch.autocast(device_type='cuda'):
+        with torch.autocast(device_type="cuda"):
             device = self.transformer.device
 
             if encoded_audio is not None:
@@ -200,7 +200,7 @@ class AsrModelForGeneration(nn.Module):
         top_p: float = 1.0,
     ) -> torch.Tensor:
         input_ids = self.decoder.tokenizer(self.sep_token, return_tensors="pt")
-        with torch.autocast(device_type='cuda'):
+        with torch.autocast(device_type="cuda"):
             self.decoder.clear_kvcache()
             logits = self.decoder(
                 encoded_audio=audio_features,
