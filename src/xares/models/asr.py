@@ -59,40 +59,41 @@ class Decoder(nn.Module):
     ) -> Tuple[List[Tensor], Tensor]:
         assert encoded_audio is not None or input_ids is not None, "Either encoded_audio or input_ids must be provided"
         assert self.transformer.device == self.encoder_adapter.fc_1.weight.device
-        device = self.transformer.device
+        with torch.autocast(device_type="cuda"):
+            device = self.transformer.device
 
-        if encoded_audio is not None:
-            encoded_audio = encoded_audio.to(device)
-            x_a = self.encoder_adapter(encoded_audio)
-            if attention_mask_a is None:
-                attention_mask_a = torch.ones(x_a.shape[0], x_a.shape[1], dtype=torch.long)
-            attention_mask_a = attention_mask_a.to(device)
-        else:
-            x_a = torch.tensor([], device=device)
-            attention_mask_a = torch.tensor([], device=device)
+            if encoded_audio is not None:
+                encoded_audio = encoded_audio.to(device)
+                x_a = self.encoder_adapter(encoded_audio)
+                if attention_mask_a is None:
+                    attention_mask_a = torch.ones(x_a.shape[0], x_a.shape[1], dtype=torch.long)
+                attention_mask_a = attention_mask_a.to(device)
+            else:
+                x_a = torch.tensor([], device=device)
+                attention_mask_a = torch.tensor([], device=device)
 
-        if input_ids is not None:
-            input_ids = input_ids.to(device)
-            if input_ids.dim() == 1:
-                input_ids = torch.unsqueeze(input_ids, 0)
-            x_t = self.transformer.get_input_embeddings()(input_ids)
-            if attention_mask_t is None:
-                attention_mask_t = torch.ones(x_t.shape[0], x_t.shape[1], dtype=torch.long)
-            attention_mask_t = attention_mask_t.to(device)
-        else:
-            x_t = torch.tensor([], device=device)
-            attention_mask_t = torch.tensor([], device=device)
+            if input_ids is not None:
+                input_ids = input_ids.to(device)
+                if input_ids.dim() == 1:
+                    input_ids = torch.unsqueeze(input_ids, 0)
+                x_t = self.transformer.get_input_embeddings()(input_ids)
+                if attention_mask_t is None:
+                    attention_mask_t = torch.ones(x_t.shape[0], x_t.shape[1], dtype=torch.long)
+                attention_mask_t = attention_mask_t.to(device)
+            else:
+                x_t = torch.tensor([], device=device)
+                attention_mask_t = torch.tensor([], device=device)
 
-        x = torch.cat([x_a, x_t], dim=1)
-        attention_mask = torch.cat([attention_mask_a, attention_mask_t], dim=1)
+            x = torch.cat([x_a, x_t], dim=1)
+            attention_mask = torch.cat([attention_mask_a, attention_mask_t], dim=1)
 
-        output = self.transformer(
-            inputs_embeds=x,
-            attention_mask=attention_mask,
-            past_key_values=self.past_key_values if enable_kvcache else None,
-            labels=labels,
-            num_logits_to_keep=labels.shape[1] if labels is not None else 0,
-        )
+            output = self.transformer(
+                inputs_embeds=x,
+                attention_mask=attention_mask,
+                past_key_values=self.past_key_values if enable_kvcache else None,
+                labels=labels,
+                num_logits_to_keep=labels.shape[1] if labels is not None else 0,
+            )
 
         if enable_kvcache:
             self.past_key_values = output.past_key_values
@@ -199,19 +200,20 @@ class AsrModelForGeneration(nn.Module):
         top_p: float = 1.0,
     ) -> torch.Tensor:
         input_ids = self.decoder.tokenizer(self.sep_token, return_tensors="pt")
-        self.decoder.clear_kvcache()
-        logits = self.decoder(
-            encoded_audio=audio_features,
-            attention_mask_a=None,
-            input_ids=input_ids["input_ids"],
-            enable_kvcache=True,
-        ).logits
+        with torch.autocast(device_type="cuda"):
+            self.decoder.clear_kvcache()
+            logits = self.decoder(
+                encoded_audio=audio_features,
+                attention_mask_a=None,
+                input_ids=input_ids["input_ids"],
+                enable_kvcache=True,
+            ).logits
 
-        outputs = []
-        next_t = sample(logits, temperature=temperature, top_k=top_k, top_p=top_p)
-
-        while next_t != self.decoder.tokenizer.eos_token_id and len(outputs) < max_returned_tokens:
-            outputs.append(next_t.item())
-            logits = self.decoder(input_ids=next_t, enable_kvcache=True).logits
+            outputs = []
             next_t = sample(logits, temperature=temperature, top_k=top_k, top_p=top_p)
-        return outputs
+
+            while next_t != self.decoder.tokenizer.eos_token_id and len(outputs) < max_returned_tokens:
+                outputs.append(next_t.item())
+                logits = self.decoder(input_ids=next_t, enable_kvcache=True).logits
+                next_t = sample(logits, temperature=temperature, top_k=top_k, top_p=top_p)
+            return outputs
