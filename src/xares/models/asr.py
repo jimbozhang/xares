@@ -59,34 +59,34 @@ class Decoder(nn.Module):
     ) -> Tuple[List[Tensor], Tensor]:
         assert encoded_audio is not None or input_ids is not None, "Either encoded_audio or input_ids must be provided"
         assert self.transformer.device == self.encoder_adapter.fc_1.weight.device
+        device = self.transformer.device
+
+        if encoded_audio is not None:
+            encoded_audio = encoded_audio.to(device)
+            x_a = self.encoder_adapter(encoded_audio)
+            if attention_mask_a is None:
+                attention_mask_a = torch.ones(x_a.shape[0], x_a.shape[1], dtype=torch.long)
+            attention_mask_a = attention_mask_a.to(device)
+        else:
+            x_a = torch.tensor([], device=device)
+            attention_mask_a = torch.tensor([], device=device)
+
+        if input_ids is not None:
+            input_ids = input_ids.to(device)
+            if input_ids.dim() == 1:
+                input_ids = torch.unsqueeze(input_ids, 0)
+            x_t = self.transformer.get_input_embeddings()(input_ids)
+            if attention_mask_t is None:
+                attention_mask_t = torch.ones(x_t.shape[0], x_t.shape[1], dtype=torch.long)
+            attention_mask_t = attention_mask_t.to(device)
+        else:
+            x_t = torch.tensor([], device=device)
+            attention_mask_t = torch.tensor([], device=device)
+
+        x = torch.cat([x_a, x_t], dim=1)
+        attention_mask = torch.cat([attention_mask_a, attention_mask_t], dim=1)
+
         with torch.autocast(device_type="cuda"):
-            device = self.transformer.device
-
-            if encoded_audio is not None:
-                encoded_audio = encoded_audio.to(device)
-                x_a = self.encoder_adapter(encoded_audio)
-                if attention_mask_a is None:
-                    attention_mask_a = torch.ones(x_a.shape[0], x_a.shape[1], dtype=torch.long)
-                attention_mask_a = attention_mask_a.to(device)
-            else:
-                x_a = torch.tensor([], device=device)
-                attention_mask_a = torch.tensor([], device=device)
-
-            if input_ids is not None:
-                input_ids = input_ids.to(device)
-                if input_ids.dim() == 1:
-                    input_ids = torch.unsqueeze(input_ids, 0)
-                x_t = self.transformer.get_input_embeddings()(input_ids)
-                if attention_mask_t is None:
-                    attention_mask_t = torch.ones(x_t.shape[0], x_t.shape[1], dtype=torch.long)
-                attention_mask_t = attention_mask_t.to(device)
-            else:
-                x_t = torch.tensor([], device=device)
-                attention_mask_t = torch.tensor([], device=device)
-
-            x = torch.cat([x_a, x_t], dim=1)
-            attention_mask = torch.cat([attention_mask_a, attention_mask_t], dim=1)
-
             output = self.transformer(
                 inputs_embeds=x,
                 attention_mask=attention_mask,
