@@ -222,3 +222,14 @@ class MyCustomEncoder(torch.nn.Module):
 
 Adding a new task is easy. Refer to the existing task implementations for guidance.
 You need to create a `TaskConfig` tailored to your chosen dataset.
+
+## Citation
+
+```bibtex
+@inproceedings{zhang2025xares,
+  title={X-ARES: A Comprehensive Framework for Assessing Audio Encoder Performance},
+  author={Zhang, Junbo and Dinkel, Heinrich and Niu, Yadong and Liu, Chenyu and Cheng, Si and Zhao, Anbei and Luan, Jian},
+  booktitle={Interspeech 2025},
+  year={2025}
+}
+```
