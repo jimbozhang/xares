@@ -6,7 +6,8 @@
 
 ## Introduction
 
-X-ARES is a benchmark for evaluating audio encoders on various audio tasks. It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/).
+X-ARES (pron /eks ˈeəz/) is an audio encoder benchmark that ​automatically trains task-specific output layers​ (including MLPs and k-NN) ​on user provided encoders.
+It is heavily inspired by the [HEAR benchmark](https://hearbenchmark.com/).
 
 ## Supported tasks
 
