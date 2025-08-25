@@ -16,7 +16,7 @@ class WhisperEncoder(torch.nn.Module):
 
         self.sampling_rate = self.processor.feature_extractor.sampling_rate
         self.output_dim = self.model.config.d_model
-        self.hop_size_in_ms = self.processor.feature_extractor.hop_length/self.sampling_rate*1000
+        self.hop_size_in_ms = self.processor.feature_extractor.hop_length / self.sampling_rate * 1000
         self.max_length = int(10 * self.sampling_rate)
 
     @classmethod

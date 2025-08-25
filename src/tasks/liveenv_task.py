@@ -46,5 +46,5 @@ def liveenv_config(encoder) -> TaskConfig:
         test_split="liveenv_test",
         train_split="liveenv_train",
         valid_split="liveenv_test",
-        eval_weight=5000,    
+        eval_weight=5000,
     )

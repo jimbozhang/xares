@@ -244,6 +244,12 @@ def create_rawaudio_webdataset(
     return dataloader
 
 
+def transpose_tensor(x):
+    return x.transpose()
+
+def noop(x):
+    return x
+
 def create_embedding_webdataset(
     urls: Union[List[str], Dict[str, List[str]]],
     tar_shuffle: None | int = None,
@@ -260,8 +266,8 @@ def create_embedding_webdataset(
         batch_size=batch_size,
         rename_keys=dict(embedding="npy", target="json", filename="__key__"),
         map_kwargs=dict(
-            embedding=lambda x: x.transpose(),
-            target=label_processor if label_processor else lambda x: x,
+            embedding=transpose_tensor,
+            target=label_processor if label_processor else noop,
         ),  # Transpose (B,T,D) -> (B,D,T), map the labels if provided
         merge_function=merge_processor,
     )
@@ -276,6 +282,7 @@ def create_embedding_webdataset(
     dataloader = wds.WebLoader(
         dataset,
         batch_size=None,
+        pin_memory=True,
         num_workers=num_workers,
     ).unbatched()
     if training:

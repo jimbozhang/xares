@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import InitVar, dataclass, field
-from functools import partial
 from typing import Any, Dict, Iterable, Literal, Tuple
 
 import torch
@@ -69,22 +68,13 @@ def prepare_frame_task_batch(batch: Tuple, device: torch.device | str = "cpu"):
 
 
 def prepare_asr_task_batch(
-    batch: Tuple, device: torch.device | str = "cpu", tokenizer: Any = None, sep_token: str = "<|vision_end|>"
+    batch: Tuple,
+    device: torch.device | str = "cpu",
 ):
-    if tokenizer is None:
-        raise ValueError("Tokenizer must be provided for ASR task.")
-
-    from transformers import DataCollatorForLanguageModeling
-
-    (x, _), labels, _ = batch
-
-    text_with_eos_bos = [f"{sep_token}{label['trans']}{tokenizer.eos_token}" for label in labels]
-    tokens = [tokenizer(text) for text in text_with_eos_bos]
-    data_collator_for_lm = DataCollatorForLanguageModeling(tokenizer, mlm=False)
-    y = data_collator_for_lm(tokens)["input_ids"]
-
+    (x, x_length), labels, _ = batch
+    text = [l['trans'] for l in labels]
     # x are (B,D,T), but models need B,T,D
-    return x.transpose(-2, -1).contiguous().to(device), y.contiguous().to(device)
+    return x.transpose(-2, -1).contiguous().to(device), x_length.to(device), text
 
 
 @dataclass
@@ -104,9 +94,9 @@ class Trainer:
     label_name: str = "target"
     save_model: bool = True
     decay_fraction: float = 0.1  # Decay learning rate
-    task_type: InitVar[Literal["frame", "clip", "contrastive"]] = "clip"
+    task_type: InitVar[Literal["frame", "clip", "contrastive", "asr"]] = "clip"
 
-    def __post_init__(self, task_type: Literal["frame", "clip", "contrastive"] = "clip"):
+    def __post_init__(self, task_type: Literal["frame", "clip", "contrastive", "asr"] = "clip"):
         try:
             self.optimizer = getattr(optim, self.optimizer)(self.model.parameters(), lr=self.lr)
         except AttributeError:
@@ -119,7 +109,7 @@ class Trainer:
         elif task_type == "contrastive":
             self.prepare_batch_function = prepare_contrastive_task_batch
         elif task_type == "asr":
-            self.prepare_batch_function = partial(prepare_asr_task_batch, tokenizer=self.model.tokenizer)
+            self.prepare_batch_function = prepare_asr_task_batch
         else:
             raise NotImplementedError(f"Trainer.prepare_batch_function for task_type {task_type} not implemented.")
 
@@ -144,23 +134,22 @@ class Trainer:
         RunningAverage(output_transform=lambda x: x["loss"]).attach(self.ignite_trainer, "loss_avg")
         ProgressBar(bar_format=None).attach(self.ignite_evaluator)
 
+    @torch.enable_grad()
     def train_step(self, engine: Engine, batch: Tuple) -> Dict[str, Tensor]:
         self.model.train()
-        with torch.enable_grad():
+        with torch.autocast(device_type='cuda'):
             self.optimizer.zero_grad()
             loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
             loss.backward()
-
             self.optimizer.step()
-            self.optimizer.zero_grad()
 
-            return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
+        return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 
+    @torch.inference_mode()
     def validation_step(self, engine: Engine, batch: Tuple) -> Tuple[Tensor, Tensor]:
         self.model.eval()
-        with torch.inference_mode():
-            y_pred, y = self.model(*self.prepare_batch_function(batch, self.device), return_loss=False)
-            return y_pred, y
+        y_pred, y = self.model(*self.prepare_batch_function(batch, self.device), return_loss=False)
+        return y_pred, y
 
     def run_inference(self, dl_eval):
         local_evaluator = self.ignite_evaluator

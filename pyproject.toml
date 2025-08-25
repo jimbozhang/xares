@@ -16,7 +16,6 @@ dependencies = [
   "torchmetrics>=1.6.1",
   "pandas>=2.2.3",
   "pytorch-ignite>=0.5.1",
-  "pyyaml",
   "soundfile>=0.13.1",  
   "transformers>=4.47.1",
   "tqdm",
