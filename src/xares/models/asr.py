@@ -92,7 +92,7 @@ class Decoder(nn.Module):
                 attention_mask=attention_mask,
                 past_key_values=self.past_key_values if enable_kvcache else None,
                 labels=labels,
-                num_logits_to_keep=labels.shape[1] if labels is not None else 0,
+                logits_to_keep=labels.shape[1] if labels is not None else 0,
             )
 
         if enable_kvcache:
