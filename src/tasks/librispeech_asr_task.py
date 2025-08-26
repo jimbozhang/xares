@@ -8,7 +8,7 @@ def librispeech_asr_config(encoder) -> TaskConfig:
         encoder=encoder,
         eval_weight=10000,
         batch_size_train=4,
-        batch_size_valid=64,
+        batch_size_valid=16,
         batch_size_encode=1,
         disabled=False,
         do_knn=False,
