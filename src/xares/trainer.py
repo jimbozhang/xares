@@ -137,11 +137,10 @@ class Trainer:
     @torch.enable_grad()
     def train_step(self, engine: Engine, batch: Tuple) -> Dict[str, Tensor]:
         self.model.train()
-        with torch.autocast(device_type='cuda'):
-            self.optimizer.zero_grad()
-            loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
-            loss.backward()
-            self.optimizer.step()
+        self.optimizer.zero_grad()
+        loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
+        loss.backward()
+        self.optimizer.step()
 
         return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 
