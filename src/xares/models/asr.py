@@ -65,6 +65,7 @@ class AsrModelForGeneration(nn.Module):
         text_tokens, text_masks = self._to_tokens(new_text)
         text_embeddings = self.embed_tokens(text_tokens)
         targets = text_tokens.masked_fill(text_tokens == self.tokenizer.pad_token_id, -100)
+        # Here we want to set the first pad_token_id to correctly stop, all others are set to -100
         sequence_lengths = text_masks.sum(dim=1)
         batch_indices = torch.arange(text_tokens.size(0), device=text_tokens.device)
         last_token_indices = sequence_lengths - 1
@@ -121,6 +122,8 @@ class AsrModelForGeneration(nn.Module):
                     max_new_tokens=200,
                     top_k=None,
                     top_p=1.0,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                    do_sample=True,
                 )
                 generated_texts = self.tokenizer.batch_decode(
                     generated_output, add_special_tokens=False, skip_special_tokens=True

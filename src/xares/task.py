@@ -75,6 +75,7 @@ class TaskConfig:
         | Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
     ) = "CrossEntropyLoss"
     batch_size_train: int = 32
+    batch_size_valid: int | None =  None
     learning_rate: float = 1e-3
     epochs: int = 10
     num_training_workers: int = 0
@@ -93,6 +94,8 @@ class TaskConfig:
 
         if self.formal_name == "":
             self.formal_name = self.name
+        if self.batch_size_valid is None:
+            self.batch_size_valid = self.batch_size_train
 
         self.update_tar_name_of_split()
         if self.env_root is None:
@@ -328,7 +331,7 @@ class XaresTask:
         )
         dl_val = create_embedding_webdataset(
             validation_url,
-            batch_size=self.config.batch_size_train,
+            batch_size=self.config.batch_size_valid,
             num_workers=self.config.num_validation_workers,
             training=False,
             label_processor=self.label_processor,
