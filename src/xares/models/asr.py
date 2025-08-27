@@ -129,5 +129,4 @@ class AsrModelForGeneration(nn.Module):
                 generated_texts = self.tokenizer.batch_decode(
                     generated_output, add_special_tokens=False, skip_special_tokens=True
                 )
-                print(f"{generated_texts[0]=} {text[0]=}")
                 return generated_texts, text
