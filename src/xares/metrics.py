@@ -151,8 +151,10 @@ class WerScore(Metric):
 
     def compute(self) -> Dict[str, float] | float:
         from jiwer import wer
+        target = [text.lower() for text in self.target]
+        pred = [text.lower() for text in self.pred]
 
-        wer_score = max(0, 1 - wer(self.target, self.pred))
+        wer_score = max(0, 1 - wer(target, pred))
         return wer_score
 
 

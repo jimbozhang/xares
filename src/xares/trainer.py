@@ -86,6 +86,7 @@ class Trainer:
     optimizer: str = "Adam"
     lr: float = 3e-3
     max_epochs: int = 10
+    valid_every: int = 1
     ckpt_dir: str = "checkpoints"
     best_ckpt_path: str | None = None
     ckpt_name: str = "best_model.pt"
@@ -163,7 +164,7 @@ class Trainer:
         for name, metric in metrics.items():
             metric.attach(self.ignite_evaluator, name)
 
-        @self.ignite_trainer.on(Events.EPOCH_COMPLETED)
+        @self.ignite_trainer.on(Events.EPOCH_COMPLETED(every=self.valid_every))
         def log_validation_results(trainer):
             self.ignite_evaluator.run(dl_dev)
             metrics = self.ignite_evaluator.state.metrics

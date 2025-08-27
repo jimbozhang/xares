@@ -3,6 +3,7 @@ from typing import List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from jiwer import wer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -69,7 +70,7 @@ class AsrModelForGeneration(nn.Module):
         sequence_lengths = text_masks.sum(dim=1)
         batch_indices = torch.arange(text_tokens.size(0), device=text_tokens.device)
         last_token_indices = sequence_lengths - 1
-        targets[batch_indices, last_token_indices] = self.tokenizer.pad_token_id
+        targets[batch_indices, last_token_indices] = self.tokenizer.eos_token_id
         return text_embeddings, text_masks, targets
 
     def _prepare_audio_text_inputs(
@@ -102,7 +103,6 @@ class AsrModelForGeneration(nn.Module):
         input_embeds, input_mask, labels = self._prepare_audio_text_inputs(
             audio_features=audio_features, audio_length=audio_length, text=text
         )
-
         if return_loss:
             with torch.autocast(device_type="cuda"):
                 result = self.transformer(
@@ -120,12 +120,14 @@ class AsrModelForGeneration(nn.Module):
                     attention_mask=input_mask,
                     temperature=1.0,
                     max_new_tokens=200,
-                    top_k=None,
+                    top_k=1,
                     top_p=1.0,
-                    pad_token_id=self.tokenizer.eos_token_id,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    repetition_penalty=1.1,
                     do_sample=True,
                 )
                 generated_texts = self.tokenizer.batch_decode(
                     generated_output, add_special_tokens=False, skip_special_tokens=True
                 )
+                print(f"{generated_texts[0]=} {text[0]=}")
                 return generated_texts, text
