@@ -65,12 +65,13 @@ class AsrModelForGeneration(nn.Module):
         new_text = [self.sep_token + t + self.eos_token for t in text]
         text_tokens, text_masks = self._to_tokens(new_text)
         text_embeddings = self.embed_tokens(text_tokens)
-        targets = text_tokens.masked_fill(text_tokens == self.tokenizer.pad_token_id, -100)
+        targets = text_tokens.masked_fill(text_tokens == self.tokenizer.pad_token_id, -100).clone()
         # Here we want to set the first pad_token_id to correctly stop, all others are set to -100
         sequence_lengths = text_masks.sum(dim=1)
         batch_indices = torch.arange(text_tokens.size(0), device=text_tokens.device)
         last_token_indices = sequence_lengths - 1
         targets[batch_indices, last_token_indices] = self.tokenizer.eos_token_id
+        
         return text_embeddings, text_masks, targets
 
     def _prepare_audio_text_inputs(
@@ -87,9 +88,13 @@ class AsrModelForGeneration(nn.Module):
         labels = None
 
         if text is not None:
+            empty_audio_targets = torch.empty(
+                (audio_mask.shape[0], audio_mask.shape[1]), dtype=torch.long, device=self.device
+            ).fill_(-100)
             text_embeds, text_mask, labels = self._prepare_text(text)
-            input_embeds = torch.cat([input_embeds, text_embeds], dim=1)
-            input_mask = torch.cat([input_mask, text_mask], dim=1)
+            labels = torch.cat((empty_audio_targets, labels),dim=1)
+            input_embeds = torch.cat((input_embeds, text_embeds), dim=1)
+            input_mask = torch.cat((input_mask, text_mask), dim=1)
         return input_embeds, input_mask, labels
 
     def forward(
@@ -110,7 +115,6 @@ class AsrModelForGeneration(nn.Module):
                     inputs_embeds=input_embeds,
                     attention_mask=input_mask,
                     labels=labels,
-                    logits_to_keep=labels.shape[1] if labels is not None else 0,
                 )
             return result.loss
         else:  # Inference generate

@@ -73,8 +73,9 @@ def prepare_asr_task_batch(
 ):
     (x, x_length), labels, _ = batch
     text = [l['trans'] for l in labels]
+    # x_length is a bit tricky, since it can be that it is padded during feature extraction
     # x are (B,D,T), but models need B,T,D
-    return x.transpose(-2, -1).contiguous().to(device), x_length.to(device), text
+    return x.transpose(-2, -1).contiguous().to(device), None, text
 
 
 @dataclass

@@ -8,11 +8,8 @@ def librispeech_asr_config(encoder) -> TaskConfig:
         encoder=encoder,
         eval_weight=10000,
         batch_size_train=4,
-        # batch_size_valid=4,
-        # batch_size_encode=1,
-        valid_every=2,
         disabled=False,
-        sort_by_length=True, # speedup by smart chunking data 
+        sort_by_length=False, # speedup by smart chunking data 
         do_knn=False,
         formal_name="LibriSpeech-100h",
         label_processor=None,
