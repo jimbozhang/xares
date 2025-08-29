@@ -28,7 +28,7 @@ def worker(
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
     if config.disabled:
         logger.warning(f"Task {config.name} is disabled, skipping")
-        return config.formal_name, (0, 0), (0, 0), True 
+        return config.formal_name, (0, 0), (0, 0), True
     task = XaresTask(config=config)
 
     # Run the task
@@ -167,7 +167,7 @@ def main(args):
         logger.info("Scoring completed: All tasks scored.")
 
         # Print results
-        df = pd.DataFrame(return_dict.items(), columns=["py", "Scores"]).drop(columns=['py'])
+        df = pd.DataFrame(return_dict.items(), columns=["py", "Scores"]).drop(columns=["py"])
         df["Task"] = df["Scores"].apply(lambda x: x[0])
         df["MLP_Score"] = df["Scores"].apply(lambda x: x[1][0])
         df["KNN_Score"] = df["Scores"].apply(lambda x: x[2][0])
@@ -181,7 +181,9 @@ def main(args):
         print("\nWeighted Average MLP Score for All Datasets:", avg_mlp_all)
         print("Weighted Average KNN Score for All Datasets:", avg_knn_all)
         if any([v[-1] == True for v in return_dict.values()]):
-            avg_mlp_public, avg_knn_public = weighted_average({k: v[1:-1] for k, v in return_dict.items() if v[-1] == True})
+            avg_mlp_public, avg_knn_public = weighted_average(
+                {k: v[1:-1] for k, v in return_dict.items() if v[-1] == True}
+            )
 
             print("\nWeighted Average MLP Score for Public Datasets:", avg_mlp_public)
             print("Weighted Average KNN Score for Public Datasets:", avg_knn_public)

@@ -151,6 +151,7 @@ class WerScore(Metric):
 
     def compute(self) -> Dict[str, float] | float:
         from jiwer import wer
+
         target = [text.lower() for text in self.target]
         pred = [text.lower() for text in self.pred]
 

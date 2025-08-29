@@ -243,6 +243,7 @@ def create_rawaudio_webdataset(
     )
     return dataloader
 
+
 def est_length_for_sample(item):
     embeddings, *_ = item
     return embeddings.shape[-1]
@@ -273,14 +274,17 @@ def _sort_by_length(
             yield batch
         buf = []
 
+
 apply_sort_by_length = wds.pipelinefilter(_sort_by_length)
 
 
 def transpose_tensor(x):
     return x.transpose()
 
+
 def noop(x):
     return x
+
 
 def create_embedding_webdataset(
     urls: Union[List[str], Dict[str, List[str]]],

@@ -72,10 +72,11 @@ def prepare_asr_task_batch(
     device: torch.device | str = "cpu",
 ):
     (x, x_length), labels, _ = batch
-    text = [l['trans'] for l in labels]
+    text = [l["trans"] for l in labels]
     # x_length is a bit tricky, since it can be that it is padded during feature extraction
     # x are (B,D,T), but models need B,T,D
-    return x.transpose(-2, -1).contiguous().to(device), None, text
+    # return x.transpose(-2, -1).contiguous().to(device), None, text
+    return x.transpose(-2, -1).contiguous().to(device), x_length.to(device), text
 
 
 @dataclass
@@ -116,7 +117,8 @@ class Trainer:
             raise NotImplementedError(f"Trainer.prepare_batch_function for task_type {task_type} not implemented.")
 
         self.ignite_trainer = Engine(self.train_step)
-        self.ignite_evaluator = Engine(self.validation_step)
+        self.ignite_validator = Engine(self.validation_step)
+        self.ignite_evaluator = Engine(self.evaluate_step)
         # Schedule cosine annealing during training
         if self.max_epochs > 1:
             scheduler = CosineAnnealingScheduler(
@@ -134,6 +136,7 @@ class Trainer:
             bar_format=None,
         ).attach(self.ignite_trainer, output_transform=lambda x: x)
         RunningAverage(output_transform=lambda x: x["loss"]).attach(self.ignite_trainer, "loss_avg")
+        ProgressBar(bar_format=None).attach(self.ignite_validator)
         ProgressBar(bar_format=None).attach(self.ignite_evaluator)
 
     @torch.enable_grad()
@@ -152,6 +155,16 @@ class Trainer:
         y_pred, y = self.model(*self.prepare_batch_function(batch, self.device), return_loss=False)
         return y_pred, y
 
+    @torch.inference_mode()
+    def evaluate_step(self, engine: Engine, batch: Tuple) -> Tuple[Tensor, Tensor]:
+        self.model.eval()
+        # For the ASR model
+        if hasattr(self.model, "generate"):
+            y_pred, y = self.model.generate(*self.prepare_batch_function(batch, self.device))
+        else:
+            y_pred, y = self.model(*self.prepare_batch_function(batch, self.device))
+        return y_pred, y
+
     def run_inference(self, dl_eval):
         local_evaluator = self.ignite_evaluator
         eval_metric = self._metric_obj.metric(**self.metric_args)
@@ -163,12 +176,12 @@ class Trainer:
     def run(self, dl_train, dl_dev):
         metrics = {"loss": Loss(self.model.criterion), self.metric: self._metric_obj.metric(**self.metric_args)}
         for name, metric in metrics.items():
-            metric.attach(self.ignite_evaluator, name)
+            metric.attach(self.ignite_validator, name)
 
         @self.ignite_trainer.on(Events.EPOCH_COMPLETED(every=self.valid_every))
         def log_validation_results(trainer):
-            self.ignite_evaluator.run(dl_dev)
-            metrics = self.ignite_evaluator.state.metrics
+            self.ignite_validator.run(dl_dev)
+            metrics = self.ignite_validator.state.metrics
             logger.info(
                 f"Epoch: {trainer.state.epoch} {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
             )
@@ -185,7 +198,7 @@ class Trainer:
             score_function=Checkpoint.get_default_score_fn(self.metric, self._metric_obj.score),
             global_step_transform=global_step_from_engine(self.ignite_trainer),
         )
-        with self.ignite_evaluator.add_event_handler(
+        with self.ignite_validator.add_event_handler(
             Events.EPOCH_COMPLETED, checkpoint_handler, dict(model=self.model)
         ):
             logger.info("Trainer Run.")
