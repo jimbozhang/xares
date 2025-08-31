@@ -1,5 +1,3 @@
-# Reduced from `xiaomitts/common/audiowebdataset.py`
-
 import json
 import warnings
 from functools import partial
