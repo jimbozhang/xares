@@ -15,8 +15,7 @@ class AudioTextContrastiveLoss(nn.Module):
         self.embed_regularization = embed_regularization
 
     def similarity(self, emb_x, emb_y):
-        with torch.autocast(device_type="cuda", enabled=False):
-            return self.temperature.exp() * emb_x @ emb_y.t()
+        return self.temperature.exp() * emb_x @ emb_y.t()
 
     def forward(self, audio_embed, text_embed):
         sim_a2t = self.similarity(audio_embed, text_embed)

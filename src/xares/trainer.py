@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import InitVar, dataclass, field
-from functools import partial
 from typing import Any, Dict, Iterable, Literal, Tuple
 
 import torch
@@ -69,22 +68,15 @@ def prepare_frame_task_batch(batch: Tuple, device: torch.device | str = "cpu"):
 
 
 def prepare_asr_task_batch(
-    batch: Tuple, device: torch.device | str = "cpu", tokenizer: Any = None, sep_token: str = "<|vision_end|>"
+    batch: Tuple,
+    device: torch.device | str = "cpu",
 ):
-    if tokenizer is None:
-        raise ValueError("Tokenizer must be provided for ASR task.")
-
-    from transformers import DataCollatorForLanguageModeling
-
-    (x, _), labels, _ = batch
-
-    text_with_eos_bos = [f"{sep_token}{label['trans']}{tokenizer.eos_token}" for label in labels]
-    tokens = [tokenizer(text) for text in text_with_eos_bos]
-    data_collator_for_lm = DataCollatorForLanguageModeling(tokenizer, mlm=False)
-    y = data_collator_for_lm(tokens)["input_ids"]
-
+    (x, x_length), labels, _ = batch
+    text = [l["trans"] for l in labels]
+    # x_length is a bit tricky, since it can be that it is padded during feature extraction
     # x are (B,D,T), but models need B,T,D
-    return x.transpose(-2, -1).contiguous().to(device), y.contiguous().to(device)
+    # return x.transpose(-2, -1).contiguous().to(device), None, text
+    return x.transpose(-2, -1).contiguous().to(device), x_length.to(device), text
 
 
 @dataclass
@@ -96,6 +88,7 @@ class Trainer:
     optimizer: str = "Adam"
     lr: float = 3e-3
     max_epochs: int = 10
+    valid_every: int = 1
     ckpt_dir: str = "checkpoints"
     best_ckpt_path: str | None = None
     ckpt_name: str = "best_model.pt"
@@ -104,9 +97,9 @@ class Trainer:
     label_name: str = "target"
     save_model: bool = True
     decay_fraction: float = 0.1  # Decay learning rate
-    task_type: InitVar[Literal["frame", "clip", "contrastive"]] = "clip"
+    task_type: InitVar[Literal["frame", "clip", "contrastive", "asr"]] = "clip"
 
-    def __post_init__(self, task_type: Literal["frame", "clip", "contrastive"] = "clip"):
+    def __post_init__(self, task_type: Literal["frame", "clip", "contrastive", "asr"] = "clip"):
         try:
             self.optimizer = getattr(optim, self.optimizer)(self.model.parameters(), lr=self.lr)
         except AttributeError:
@@ -119,12 +112,13 @@ class Trainer:
         elif task_type == "contrastive":
             self.prepare_batch_function = prepare_contrastive_task_batch
         elif task_type == "asr":
-            self.prepare_batch_function = partial(prepare_asr_task_batch, tokenizer=self.model.tokenizer)
+            self.prepare_batch_function = prepare_asr_task_batch
         else:
             raise NotImplementedError(f"Trainer.prepare_batch_function for task_type {task_type} not implemented.")
 
         self.ignite_trainer = Engine(self.train_step)
-        self.ignite_evaluator = Engine(self.validation_step)
+        self.ignite_validator = Engine(self.validation_step)
+        self.ignite_evaluator = Engine(self.evaluate_step)
         # Schedule cosine annealing during training
         if self.max_epochs > 1:
             scheduler = CosineAnnealingScheduler(
@@ -142,25 +136,34 @@ class Trainer:
             bar_format=None,
         ).attach(self.ignite_trainer, output_transform=lambda x: x)
         RunningAverage(output_transform=lambda x: x["loss"]).attach(self.ignite_trainer, "loss_avg")
+        ProgressBar(bar_format=None).attach(self.ignite_validator)
         ProgressBar(bar_format=None).attach(self.ignite_evaluator)
 
+    @torch.enable_grad()
     def train_step(self, engine: Engine, batch: Tuple) -> Dict[str, Tensor]:
         self.model.train()
-        with torch.enable_grad():
-            self.optimizer.zero_grad()
-            loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
-            loss.backward()
+        self.optimizer.zero_grad()
+        loss = self.model(*self.prepare_batch_function(batch, self.device), return_loss=True)
+        loss.backward()
+        self.optimizer.step()
 
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+        return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
 
-            return {"loss": loss.item(), "lr": self.optimizer.param_groups[0]["lr"]}
-
+    @torch.inference_mode()
     def validation_step(self, engine: Engine, batch: Tuple) -> Tuple[Tensor, Tensor]:
         self.model.eval()
-        with torch.inference_mode():
-            y_pred, y = self.model(*self.prepare_batch_function(batch, self.device), return_loss=False)
-            return y_pred, y
+        y_pred, y = self.model(*self.prepare_batch_function(batch, self.device), return_loss=False)
+        return y_pred, y
+
+    @torch.inference_mode()
+    def evaluate_step(self, engine: Engine, batch: Tuple) -> Tuple[Tensor, Tensor]:
+        self.model.eval()
+        # For the ASR model
+        if hasattr(self.model, "generate"):
+            y_pred, y = self.model.generate(*self.prepare_batch_function(batch, self.device))
+        else:
+            y_pred, y = self.model(*self.prepare_batch_function(batch, self.device))
+        return y_pred, y
 
     def run_inference(self, dl_eval):
         local_evaluator = self.ignite_evaluator
@@ -173,12 +176,12 @@ class Trainer:
     def run(self, dl_train, dl_dev):
         metrics = {"loss": Loss(self.model.criterion), self.metric: self._metric_obj.metric(**self.metric_args)}
         for name, metric in metrics.items():
-            metric.attach(self.ignite_evaluator, name)
+            metric.attach(self.ignite_validator, name)
 
-        @self.ignite_trainer.on(Events.EPOCH_COMPLETED)
+        @self.ignite_trainer.on(Events.EPOCH_COMPLETED(every=self.valid_every))
         def log_validation_results(trainer):
-            self.ignite_evaluator.run(dl_dev)
-            metrics = self.ignite_evaluator.state.metrics
+            self.ignite_validator.run(dl_dev)
+            metrics = self.ignite_validator.state.metrics
             logger.info(
                 f"Epoch: {trainer.state.epoch} {self.metric}: {metrics[self.metric]:.3f}  Avg loss: {metrics['loss']:.5f}"
             )
@@ -195,7 +198,7 @@ class Trainer:
             score_function=Checkpoint.get_default_score_fn(self.metric, self._metric_obj.score),
             global_step_transform=global_step_from_engine(self.ignite_trainer),
         )
-        with self.ignite_evaluator.add_event_handler(
+        with self.ignite_validator.add_event_handler(
             Events.EPOCH_COMPLETED, checkpoint_handler, dict(model=self.model)
         ):
             logger.info("Trainer Run.")

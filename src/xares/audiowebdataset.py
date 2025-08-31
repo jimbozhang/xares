@@ -1,5 +1,3 @@
-# Reduced from `xiaomitts/common/audiowebdataset.py`
-
 import json
 import warnings
 from functools import partial
@@ -244,6 +242,48 @@ def create_rawaudio_webdataset(
     return dataloader
 
 
+def est_length_for_sample(item):
+    embeddings, *_ = item
+    return embeddings.shape[-1]
+
+
+def _sort_by_length(
+    data,
+    bufsize=64,
+    reverse: bool = True,
+    handler=None,
+):
+    buf = []
+    for sample in data:
+        buf.append(sample)
+        if len(buf) < bufsize:
+            try:
+                buf.append(next(data))
+            except StopIteration:
+                pass
+        if len(buf) >= bufsize:
+            buf.sort(key=est_length_for_sample, reverse=reverse)
+            for batch in buf:
+                yield batch
+            buf = []
+    while len(buf) > 0:
+        buf.sort(key=est_length_for_sample, reverse=reverse)
+        for batch in buf:
+            yield batch
+        buf = []
+
+
+apply_sort_by_length = wds.pipelinefilter(_sort_by_length)
+
+
+def transpose_tensor(x):
+    return x.transpose()
+
+
+def noop(x):
+    return x
+
+
 def create_embedding_webdataset(
     urls: Union[List[str], Dict[str, List[str]]],
     tar_shuffle: None | int = None,
@@ -251,6 +291,7 @@ def create_embedding_webdataset(
     balanced_sampler: None | bool = False,
     num_workers: int = 4,
     training: bool = False,
+    sort_by_length: bool = False,
     label_processor: None | Callable = None,
     merge_processor: None | Callable = None,
     **kwargs,
@@ -260,8 +301,8 @@ def create_embedding_webdataset(
         batch_size=batch_size,
         rename_keys=dict(embedding="npy", target="json", filename="__key__"),
         map_kwargs=dict(
-            embedding=lambda x: x.transpose(),
-            target=label_processor if label_processor else lambda x: x,
+            embedding=transpose_tensor,
+            target=label_processor if label_processor else noop,
         ),  # Transpose (B,T,D) -> (B,D,T), map the labels if provided
         merge_function=merge_processor,
     )
@@ -276,10 +317,13 @@ def create_embedding_webdataset(
     dataloader = wds.WebLoader(
         dataset,
         batch_size=None,
+        pin_memory=True,
         num_workers=num_workers,
     ).unbatched()
     if training:
         dataloader = dataloader.shuffle(512)
+        if sort_by_length:
+            dataloader = dataloader.compose(apply_sort_by_length(bufsize=512, reverse=True))
     dataloader = dataloader.batched(
         batch_size,
         collation_fn=partial(collate_with_lengths_wds, flatten=False),

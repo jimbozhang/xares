@@ -28,7 +28,7 @@ def worker(
     config = attr_from_py_path(task_py, endswith="_config")(encoder)
     if config.disabled:
         logger.warning(f"Task {config.name} is disabled, skipping")
-        return config.formal_name, (0, 0), (0, 0)
+        return config.formal_name, (0, 0), (0, 0), True
     task = XaresTask(config=config)
 
     # Run the task
@@ -152,44 +152,41 @@ def main(args):
 
     # Stage 2: Execute mlp and knn scoring
     if args.from_stage <= 2 and args.to_stage >= 2:
-        try:
-            if enable_multiprocessing:
-                manager = mp.Manager()
-                return_dict = manager.dict()
-                with mp.Pool(processes=args.max_jobs) as pool:
-                    pool.starmap(
-                        partial(stage_2, result=return_dict),
-                        [(args.encoder_py, task_py) for task_py in args.tasks_py],
-                    )
-            else:
-                return_dict = {}
-                for task_py in args.tasks_py:
-                    return_dict[task_py] = worker(args.encoder_py, task_py, do_mlp=True, do_knn=True)
-        except RuntimeError as e:
-            logger.error(f"Error in stage 2 (scoring): {e} Must fix it before proceeding.")
-            return
+        if enable_multiprocessing:
+            manager = mp.Manager()
+            return_dict = manager.dict()
+            with mp.Pool(processes=args.max_jobs) as pool:
+                pool.starmap(
+                    partial(stage_2, result=return_dict),
+                    [(args.encoder_py, task_py) for task_py in args.tasks_py],
+                )
+        else:
+            return_dict = {}
+            for task_py in args.tasks_py:
+                return_dict[task_py] = worker(args.encoder_py, task_py, do_mlp=True, do_knn=True)
         logger.info("Scoring completed: All tasks scored.")
 
         # Print results
-        df = pd.DataFrame(return_dict.items(), columns=["py", "Scores"])
-        df.drop(columns=["py"], inplace=True)
+        df = pd.DataFrame(return_dict.items(), columns=["py", "Scores"]).drop(columns=["py"])
         df["Task"] = df["Scores"].apply(lambda x: x[0])
         df["MLP_Score"] = df["Scores"].apply(lambda x: x[1][0])
         df["KNN_Score"] = df["Scores"].apply(lambda x: x[2][0])
-        df['Private']   = df["Scores"].apply(lambda x: x[3])
+        df["Private"] = df["Scores"].apply(lambda x: x[3] if len(x) > 3 else True)
         df.drop(columns=["Scores"], inplace=True)
         df.sort_values(by="Task", inplace=True)
 
         print(f"\nResults:\n{df.to_string(index=False)}")
 
         avg_mlp_all, avg_knn_all = weighted_average({k: v[1:-1] for k, v in return_dict.items()})
-        avg_mlp_public, avg_knn_public = weighted_average({k: v[1:-1] for k, v in return_dict.items() if v[-1] == True})
-
         print("\nWeighted Average MLP Score for All Datasets:", avg_mlp_all)
         print("Weighted Average KNN Score for All Datasets:", avg_knn_all)
+        if any([v[-1] == True for v in return_dict.values()]):
+            avg_mlp_public, avg_knn_public = weighted_average(
+                {k: v[1:-1] for k, v in return_dict.items() if v[-1] == True}
+            )
 
-        print("\nWeighted Average MLP Score for Public Datasets:", avg_mlp_public)
-        print("Weighted Average KNN Score for Public Datasets:", avg_knn_public)
+            print("\nWeighted Average MLP Score for Public Datasets:", avg_mlp_public)
+            print("Weighted Average KNN Score for Public Datasets:", avg_knn_public)
 
 
 if __name__ == "__main__":

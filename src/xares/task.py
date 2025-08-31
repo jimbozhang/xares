@@ -75,10 +75,13 @@ class TaskConfig:
         | Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
     ) = "CrossEntropyLoss"
     batch_size_train: int = 32
+    batch_size_valid: int | None = None
     learning_rate: float = 1e-3
     epochs: int = 10
+    valid_every: int = 1
     num_training_workers: int = 0
     num_validation_workers: int = 0
+    sort_by_length: bool = False
     model: nn.Module | None = None
     output_dim: int | None = None
     metric: METRICS_TYPE = "accuracy"
@@ -93,6 +96,8 @@ class TaskConfig:
 
         if self.formal_name == "":
             self.formal_name = self.name
+        if self.batch_size_valid is None:
+            self.batch_size_valid = self.batch_size_train
 
         self.update_tar_name_of_split()
         if self.env_root is None:
@@ -310,6 +315,7 @@ class XaresTask:
             lr=self.config.learning_rate,
             max_epochs=self.config.epochs,
             task_type=self.config.task_type,
+            valid_every=self.config.valid_every,
         )
 
         if not self.config.force_retrain_mlp and self.ckpt_path.exists():
@@ -322,14 +328,16 @@ class XaresTask:
             tar_shuffle=2000,
             batch_size=self.config.batch_size_train,
             num_workers=self.config.num_training_workers,
+            sort_by_length=self.config.sort_by_length,
             training=True,
             label_processor=self.label_processor,
             merge_processor=self.merge_processor,
         )
         dl_val = create_embedding_webdataset(
             validation_url,
-            batch_size=self.config.batch_size_train,
+            batch_size=self.config.batch_size_valid,
             num_workers=self.config.num_validation_workers,
+            sort_by_length=self.config.sort_by_length,
             training=False,
             label_processor=self.label_processor,
             merge_processor=self.merge_processor,
@@ -356,7 +364,7 @@ class XaresTask:
 
         dl = create_embedding_webdataset(
             eval_url,
-            batch_size=self.config.batch_size_train,
+            batch_size=self.config.batch_size_valid,
             num_workers=self.config.num_validation_workers,
             label_processor=self.label_processor,
             merge_processor=self.merge_processor,
