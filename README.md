@@ -112,7 +112,7 @@ Here are the evaluation results for several baseline models using MLP and kNN me
 | FSD18-Kaggle                   | **0.534** | 0.241    | 0.241     | 0.153     |
 | GTZAN Genre                    | **0.851** | 0.630    | 0.622     | 0.448     |
 | LibriCount                     | **0.681** | 0.583    | 0.549     | 0.492     |
-| LibriSpeech-100h               | 0.608     | 0.405    | 0.721     | **0.893** |
+| LibriSpeech-100h               | 0.608 (0.724 v0.1.3)     | 0.405 ()    | 0.721 (0.815 v0.1.3)    | **0.893** (0.866 v0.1.3) |
 | LibriSpeech-MF                 | **0.986** | 0.948    | 0.973     | 0.752     |
 | MAESTRO                        | **0.524** | 0.180    | 0.011     | 0.116     |
 | NSynth-Instruments             | **0.688** | 0.443    | 0.532     | 0.336     |
